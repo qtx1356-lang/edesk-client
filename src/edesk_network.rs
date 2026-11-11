@@ -8,6 +8,17 @@ use std::net::Ipv4Addr;
 ///
 /// This is a network boundary check, not peer authentication. The normal RustDesk
 /// identity and session authentication still run after the direct TCP connection.
+/// Only physical or ordinary LAN adapters may participate in eDesk discovery.
+/// Point-to-point and tunnel interfaces are excluded so VPN/overlay links are not
+/// treated as a local Wi-Fi or wired LAN.
+#[cfg(not(target_os = "ios"))]
+pub(crate) fn is_allowed_lan_interface(interface: &default_net::interface::Interface) -> bool {
+    interface.is_up()
+        && !interface.is_loopback()
+        && !interface.is_point_to_point()
+        && !interface.is_tun()
+}
+
 #[cfg(not(target_os = "ios"))]
 pub(crate) fn is_allowed_lan_ip(ip: IpAddr) -> bool {
     let peer = match ip {
@@ -21,15 +32,16 @@ pub(crate) fn is_allowed_lan_ip(ip: IpAddr) -> bool {
 
     let peer_bits = u32::from(peer);
     default_net::get_interfaces().iter().any(|interface| {
-        interface.ipv4.iter().any(|local| {
-            let local_ip: Ipv4Addr = local.addr;
-            let mask = u32::from(local.netmask);
-            mask != 0
-                && local_ip.is_private()
-                && !local_ip.is_loopback()
-                && !is_ipv4_link_local(local_ip)
-                && (u32::from(local_ip) & mask) == (peer_bits & mask)
-        })
+        is_allowed_lan_interface(interface)
+            && interface.ipv4.iter().any(|local| {
+                let local_ip: Ipv4Addr = local.addr;
+                let mask = u32::from(local.netmask);
+                mask != 0
+                    && local_ip.is_private()
+                    && !local_ip.is_loopback()
+                    && !is_ipv4_link_local(local_ip)
+                    && (u32::from(local_ip) & mask) == (peer_bits & mask)
+            })
     })
 }
 
