@@ -700,8 +700,9 @@ impl RendezvousMediator {
         }
     }
 
-    async fn handle_request_relay(&self, rr: RequestRelay, server: ServerPtr) -> ResultType<()> {
-        if let Err(err) = self.check_relay_request(&rr, Instant::now()) {
+    async fn handle_request_relay(&self, _rr: RequestRelay, _server: ServerPtr) -> ResultType<()> {
+        bail!("eDesk LAN-only mode blocks relay requests.");
+        if let Err(err) = self.check_relay_request(&_rr, Instant::now()) {
             hbb_common::throttled_log!(PUNCH_LOG_INTERVAL, warn, "Ignored relay request: {}", err);
             return Ok(());
         }
@@ -1088,6 +1089,9 @@ impl RendezvousMediator {
 
     async fn handle_punch_hole(&self, ph: PunchHole, server: ServerPtr) -> ResultType<()> {
         let mut peer_addr = AddrMangle::decode(&ph.socket_addr);
+        if !crate::edesk_network::is_allowed_lan_ip(peer_addr.ip()) {
+            bail!("eDesk LAN-only mode rejected a non-local rendezvous request.");
+        }
         let last = *LAST_MSG.lock().await;
         *LAST_MSG.lock().await = (peer_addr, Instant::now());
         // skip duplicate punch hole messages
