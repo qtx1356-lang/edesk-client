@@ -409,6 +409,9 @@ async fn create_relay_connection_(
     ipv4: bool,
     meta: ConnectionMeta,
 ) -> ResultType<()> {
+    // eDesk is a LAN-only client: relay paths are never an acceptable fallback.
+    bail!("eDesk LAN-only mode blocks relay connections.");
+
     // The proxy's address family does not constrain the relay target.
     let relay_server = crate::check_port(relay_server, RELAY_PORT);
     let use_ws_proxy = Config::is_proxy() && is_ws_endpoint(&check_ws(&relay_server));
