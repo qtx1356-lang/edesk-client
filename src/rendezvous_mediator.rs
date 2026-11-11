@@ -1064,6 +1064,7 @@ impl RendezvousMediator {
     }
 
     async fn handle_punch_hole(&self, ph: PunchHole, server: ServerPtr) -> ResultType<()> {
+        use hbb_common::protobuf::Enum;
         let mut peer_addr = AddrMangle::decode(&ph.socket_addr);
         if !crate::edesk_network::is_allowed_lan_ip(peer_addr.ip()) {
             bail!("eDesk LAN-only mode rejected a non-local rendezvous request.");
