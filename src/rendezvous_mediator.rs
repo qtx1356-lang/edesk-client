@@ -767,13 +767,35 @@ impl RendezvousMediator {
         Ok(())
     }
 
-    async fn handle_intranet(
-        &self,
-        _fla: FetchLocalAddr,
-        _server: ServerPtr,
-    ) -> ResultType<()> {
-        // eDesk does not use rendezvous local-address exchange or its relay fallback.
-        bail!("eDesk LAN-only mode blocks rendezvous intranet fallback.");
+    async fn handle_intranet(&self, fla: FetchLocalAddr, server: ServerPtr) -> ResultType<()> {
+        let peer_addr = AddrMangle::decode(&fla.socket_addr);
+        if !crate::edesk_network::is_allowed_lan_ip(peer_addr.ip()) {
+            bail!("eDesk LAN-only mode rejected a non-local intranet request.");
+        }
+        let last = *LAST_MSG.lock().await;
+        *LAST_MSG.lock().await = (peer_addr, Instant::now());
+        if last.0 == peer_addr && last.1.elapsed().as_millis() < 100 {
+            return Ok(());
+        }
+
+        // This message is local-address signaling, not a relay. Keep the existing
+        // signed peer handshake and direct TCP listener, but never advertise a
+        // relay server or IPv6 endpoint.
+        if use_ws() || Config::is_proxy() || config::is_disable_tcp_listen() {
+            bail!("eDesk requires a direct local TCP path for intranet sessions.");
+        }
+        let meta = connection_meta(
+            fla.control_permissions.clone().into_option(),
+            fla.controlled_context.clone().into_option(),
+        );
+        self.handle_intranet_(
+            fla,
+            server,
+            String::new(),
+            Default::default(),
+            meta,
+        )
+        .await
     }
 
     async fn handle_intranet_(
