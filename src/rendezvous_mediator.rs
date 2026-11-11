@@ -326,10 +326,7 @@ impl RendezvousMediator {
         if config::option2bool("stop-service", &Config::get_option("stop-service")) {
             crate::test_rendezvous_server();
         }
-        let server_cloned = server.clone();
-        tokio::spawn(async move {
-            direct_server(server_cloned).await;
-        });
+        // Raw direct-IP access is disabled; eDesk accepts only authenticated LAN punches.
         #[cfg(target_os = "android")]
         let start_lan_listening = true;
         // eDesk must answer LAN discovery requests in portable mode too; otherwise
