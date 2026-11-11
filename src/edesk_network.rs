@@ -35,14 +35,22 @@ pub(crate) fn is_allowed_lan_ip(ip: IpAddr) -> bool {
         is_allowed_lan_interface(interface)
             && interface.ipv4.iter().any(|local| {
                 let local_ip: Ipv4Addr = local.addr;
-                let mask = u32::from(local.netmask);
-                mask != 0
-                    && local_ip.is_private()
-                    && !local_ip.is_loopback()
-                    && !is_ipv4_link_local(local_ip)
-                    && (u32::from(local_ip) & mask) == (peer_bits & mask)
+                is_same_private_subnet(local_ip, local.netmask, peer)
             })
     })
+}
+
+#[cfg(not(target_os = "ios"))]
+fn is_same_private_subnet(local_ip: Ipv4Addr, netmask: Ipv4Addr, peer_ip: Ipv4Addr) -> bool {
+    let mask = u32::from(netmask);
+    mask != 0
+        && local_ip.is_private()
+        && !local_ip.is_loopback()
+        && !is_ipv4_link_local(local_ip)
+        && peer_ip.is_private()
+        && !peer_ip.is_loopback()
+        && !is_ipv4_link_local(peer_ip)
+        && (u32::from(local_ip) & mask) == (u32::from(peer_ip) & mask)
 }
 
 #[cfg(not(target_os = "ios"))]
@@ -59,6 +67,30 @@ pub(crate) fn is_allowed_lan_ip(_ip: IpAddr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn allows_only_peers_in_the_same_private_subnet() {
+        assert!(is_same_private_subnet(
+            "192.168.1.10".parse().unwrap(),
+            "255.255.255.0".parse().unwrap(),
+            "192.168.1.20".parse().unwrap(),
+        ));
+        assert!(!is_same_private_subnet(
+            "192.168.1.10".parse().unwrap(),
+            "255.255.255.0".parse().unwrap(),
+            "192.168.2.20".parse().unwrap(),
+        ));
+        assert!(is_same_private_subnet(
+            "10.20.0.10".parse().unwrap(),
+            "255.255.0.0".parse().unwrap(),
+            "10.20.5.20".parse().unwrap(),
+        ));
+        assert!(!is_same_private_subnet(
+            "192.168.1.10".parse().unwrap(),
+            "0.0.0.0".parse().unwrap(),
+            "192.168.1.20".parse().unwrap(),
+        ));
+    }
 
     #[test]
     fn rejects_non_private_and_non_ipv4_addresses() {
