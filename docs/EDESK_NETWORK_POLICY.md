@@ -63,16 +63,19 @@ If the network cannot be verified, use the same message with a short explanation
 
 The current eDesk branch now has an initial connection-layer gate:
 
-- Outgoing connections are resolved only from the LAN discovery cache. An ID by itself no longer proceeds to the normal rendezvous path.
-- A discovered peer is contacted directly over TCP only when its IPv4 address is private and matches a private IPv4 subnet on a local interface.
-- Incoming TCP sessions are rejected unless the source address passes the same private-subnet check.
-- Relay requests and relay-connection creation fail closed.
-- All rendezvous punch requests are rejected; eDesk does not establish sessions through WebRTC/ICE, IPv6 punch, TURN, or public rendezvous coordination.
-- The LAN discovery responder is started in portable desktop mode as well as installed-service mode, and discovery requests carry a fresh UUID nonce that must be echoed in the response.
-- Discovery responses are served only to sources that pass the local private-subnet check.
-- LAN discovery broadcasts and subnet validation now ignore adapters reported as down, loopback, point-to-point, or tunnel interfaces, reducing accidental use of VPN/tunnel adapters.
+- Outgoing connections require a peer that is currently present in the LAN discovery cache. An ID or IP entered manually is not sufficient.
+- After rendezvous signaling, the peer response must report a local path, and its private IPv4 address must exactly match an address recorded by LAN discovery.
+- The existing RustDesk signed peer-identity handshake is retained on the direct TCP/UDP session, so the session does not fall back to the unauthenticated raw direct-IP path.
+- Incoming punch requests are accepted only when the peer IPv4 address is private and matches a private IPv4 subnet on an eligible local interface.
+- The raw direct-IP listener is disabled. Direct TCP/UDP punch is the only supported session transport.
+- Relay requests and relay-connection creation fail closed. WebRTC/ICE, IPv6 punch, TURN and relay transports are disabled.
+- The rendezvous service is used for peer identity and connection signaling only; it must not carry session traffic. A relay fallback is never attempted.
+- The LAN discovery responder is started in portable desktop mode as well as installed-service mode. Discovery requests carry a fresh UUID nonce that must be echoed in the response, and responses are served only to sources on an eligible private subnet.
+- LAN discovery and subnet validation ignore adapters reported as down, loopback, point-to-point, or tunnel interfaces, reducing accidental use of VPN/tunnel adapters.
 
-The app may still contact the configured rendezvous service for device registration/status, but that path cannot establish or carry a remote session. This is a **first enforcement layer, not final LAN verification**. The nonce reduces acceptance of stale/replayed discovery responses, but does not authenticate the responder or cryptographically prove the peer is on the same Layer-2 broadcast domain, and does not revalidate an active session after network-interface changes. A routed private network or VPN that forwards LAN broadcasts may still require additional controls. Do not describe this build as production-secure until the remaining checks and acceptance tests pass.
+**Connectivity dependency:** this implementation still needs the configured rendezvous service for signaling and signed peer identity. It is LAN-only for session transport, but it is not yet an offline-only product. A future local trust/identity mechanism would be needed to remove that dependency without weakening encryption.
+
+This is a **first enforcement layer, not final LAN verification**. The nonce reduces acceptance of stale/replayed discovery responses, but does not authenticate the discovery responder or cryptographically prove the peer is on the same Layer-2 broadcast domain. Active sessions are not yet revalidated after network-interface changes. A routed private network or VPN that forwards LAN broadcasts may still require additional controls. Do not describe this build as production-secure until the remaining checks and acceptance tests pass.
 
 ## Implementation note
 
