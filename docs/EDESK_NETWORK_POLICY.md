@@ -66,7 +66,8 @@ The current eDesk branch now has an initial connection-layer gate:
 - Outgoing connections are resolved only from the LAN discovery cache. An ID by itself no longer proceeds to the normal rendezvous path.
 - A discovered peer is contacted directly over TCP only when its IPv4 address is private and matches a private IPv4 subnet on a local interface.
 - Incoming TCP sessions are rejected unless the source address passes the same private-subnet check.
-- Relay-connection creation fails closed.
+- Relay requests and relay-connection creation fail closed.
+- Non-local rendezvous punch requests are rejected before WebRTC/ICE setup.
 - The LAN discovery responder is started in portable desktop mode as well as installed-service mode, and discovery requests carry a fresh UUID nonce that must be echoed in the response.
 - Discovery responses are served only to sources that pass the local private-subnet check.
 - LAN discovery broadcasts and subnet validation now ignore adapters reported as down, loopback, point-to-point, or tunnel interfaces, reducing accidental use of VPN/tunnel adapters.
