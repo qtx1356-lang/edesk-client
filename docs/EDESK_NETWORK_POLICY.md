@@ -68,7 +68,7 @@ The current eDesk branch now has an initial connection-layer gate:
 - The existing RustDesk signed peer-identity handshake is retained on the direct TCP/UDP session, so the session does not fall back to the unauthenticated raw direct-IP path.
 - Incoming punch requests are accepted only when the peer IPv4 address is private and matches a private IPv4 subnet on an eligible local interface.
 - The raw direct-IP listener is disabled. Direct TCP/UDP punch is the only supported session transport.
-- Relay requests and relay-connection creation fail closed. WebRTC/ICE, IPv6 punch, TURN and relay transports are disabled.
+- Relay requests, rendezvous intranet/FetchLocalAddr fallback, and relay-connection creation fail closed. WebRTC/ICE, IPv6 punch, TURN and relay transports are disabled.
 - The rendezvous service is used for peer identity and connection signaling only; it must not carry session traffic. A relay fallback is never attempted.
 - The LAN discovery responder is started in portable desktop mode as well as installed-service mode. Discovery requests carry a fresh UUID nonce that must be echoed in the response, and responses are served only to sources on an eligible private subnet.
 - LAN discovery and subnet validation ignore adapters reported as down, loopback, point-to-point, or tunnel interfaces, reducing accidental use of VPN/tunnel adapters.
