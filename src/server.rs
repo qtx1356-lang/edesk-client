@@ -218,13 +218,13 @@ pub async fn create_tcp_connection(
     meta: ConnectionMeta,
 ) -> ResultType<()> {
     let mut stream = stream;
+    // The address the connection layer keys on, whitelist and admission alike.
+    let addr = hbb_common::try_into_v4(addr);
     // Reject non-local and non-private sources before identity/login processing.
-    // This also rejects relayed sessions, whose peer address is not on this subnet.
+    // This also rejects relay-server sourced sessions.
     if !crate::edesk_network::is_allowed_lan_ip(addr.ip()) {
         bail!("Connection blocked. eDesk accepts connections only from the same local network.");
     }
-    // The address the connection layer keys on, whitelist and admission alike.
-    let addr = hbb_common::try_into_v4(addr);
     let id = server.write().unwrap().get_new_id();
     // Admitted before the identity handshake, so a peer that stalls in it, or after it without
     // logging in, holds its place the whole time; an address over its share is turned away.
