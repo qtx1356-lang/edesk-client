@@ -594,17 +594,10 @@ impl Client {
     /// the proxy and with the real IP. Relay-by-policy without TURN rules it out too, since
     /// Relay-only ICE can then gather nothing. WebSocket does not: it tunnels only the signaling
     /// and relay legs, so the offer keeps full ICE and direct is exactly what it is there for.
-    fn should_create_webrtc_offerer(interface: &impl Interface) -> bool {
-        if !crate::get_webrtc_enabled() {
-            return false;
-        }
-        if Config::is_proxy() {
-            return false;
-        }
-        if interface.is_policy_relay() && !WebRTCStream::has_turn_server() {
-            return false;
-        }
-        true
+    fn should_create_webrtc_offerer(_interface: &impl Interface) -> bool {
+        // eDesk uses authenticated direct LAN TCP/UDP only. WebRTC can select
+        // TURN or an IPv6 route, so it is disabled in LAN-only mode.
+        false
     }
 
     /// Max ICE candidates buffered during the punch window before the answer is applied.
