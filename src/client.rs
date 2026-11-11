@@ -418,8 +418,8 @@ impl Client {
     /// Start a new connection.
     async fn _start(
         peer: &str,
-        key: &str,
-        token: &str,
+        _key: &str,
+        _token: &str,
         conn_type: ConnType,
         interface: impl Interface,
     ) -> ResultType<(
@@ -445,7 +445,9 @@ impl Client {
                 lan_peer.online && lan_peer.ip_mac.contains_key(peer)
             })
         } else if hbb_common::is_domain_port_str(peer) {
-            bail!("Connection blocked. eDesk accepts only devices discovered on the same local network.");
+            bail!(
+                "Connection blocked. eDesk accepts only devices discovered on the same local network."
+            );
         } else {
             lan_peers
                 .into_iter()
@@ -469,12 +471,16 @@ impl Client {
                             false,
                         ));
                     }
-                    Err(err) => log::debug!("LAN direct connection to {} failed: {}", endpoint, err),
+                    Err(err) => {
+                        log::debug!("LAN direct connection to {} failed: {}", endpoint, err)
+                    }
                 }
             }
         }
 
-        bail!("Connection blocked. This device is not available on the same local network. Open the LAN devices tab to refresh discovery.");
+        bail!(
+            "Connection blocked. This device is not available on the same local network. Open the LAN devices tab to refresh discovery."
+        );
 
     }
 
