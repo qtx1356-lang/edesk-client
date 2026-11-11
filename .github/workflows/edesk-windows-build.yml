@@ -5,6 +5,11 @@ on:
   # This prevents a long Windows build from starting for every small source commit.
   workflow_dispatch:
   push:
+    branches: [edesk-work]
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
     tags:
       - "edesk-v*"
 
