@@ -1,11 +1,14 @@
 //! Network checks for eDesk's same-local-subnet connection policy.
 
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
+#[cfg(not(target_os = "ios"))]
+use std::net::Ipv4Addr;
 
 /// Accept only RFC1918 IPv4 addresses that share a configured local IPv4 subnet.
 ///
 /// This is a network boundary check, not peer authentication. The normal RustDesk
 /// identity and session authentication still run after the direct TCP connection.
+#[cfg(not(target_os = "ios"))]
 pub(crate) fn is_allowed_lan_ip(ip: IpAddr) -> bool {
     let peer = match ip {
         IpAddr::V4(peer) => peer,
@@ -30,9 +33,15 @@ pub(crate) fn is_allowed_lan_ip(ip: IpAddr) -> bool {
     })
 }
 
+#[cfg(not(target_os = "ios"))]
 fn is_ipv4_link_local(ip: Ipv4Addr) -> bool {
     let octets = ip.octets();
     octets[0] == 169 && octets[1] == 254
+}
+
+#[cfg(target_os = "ios")]
+pub(crate) fn is_allowed_lan_ip(_ip: IpAddr) -> bool {
+    false
 }
 
 #[cfg(test)]
