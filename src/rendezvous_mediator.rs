@@ -1063,90 +1063,14 @@ impl RendezvousMediator {
         Ok(answer)
     }
 
-    async fn handle_punch_hole(&self, ph: PunchHole, server: ServerPtr) -> ResultType<()> {
-        let mut peer_addr = AddrMangle::decode(&ph.socket_addr);
-        if !crate::edesk_network::is_allowed_lan_ip(peer_addr.ip()) {
-            bail!("eDesk LAN-only mode rejected a non-local rendezvous request.");
-        }
-        let last = *LAST_MSG.lock().await;
-        *LAST_MSG.lock().await = (peer_addr, Instant::now());
-        // skip duplicate punch hole messages
-        if last.0 == peer_addr && last.1.elapsed().as_millis() < 100 {
-            return Ok(());
-        }
-        let local_proxy = use_ws() || Config::is_proxy();
-        let relay = local_proxy || ph.force_relay;
-        let meta = connection_meta(
-            ph.control_permissions.clone().into_option(),
-            ph.controlled_context.clone().into_option(),
-        );
-
-        // eDesk accepts direct IPv4 TCP/UDP only. Do not create WebRTC/ICE
-        // answerers (which could select TURN), IPv6 paths, or relay fallbacks.
-        let relay_v4 = ph.nat_type.enum_value() == Ok(NatType::SYMMETRIC)
-            || Config::get_nat_type() == NatType::SYMMETRIC as i32
-            || relay
-            || (config::is_disable_tcp_listen() && ph.udp_port <= 0);
-        if relay_v4 {
-            bail!("eDesk LAN-only mode blocks relay fallback.");
-        }
-
-        let punch_udp = ph.udp_port > 0;
-        let punch_tcp = ph.udp_port <= 0;
-        let (slot_udp, _slot_v6) = UDP_PUNCHES.take_pair(punch_udp, false);
-        let slot_tcp = punch_tcp.then(|| TCP_PUNCHES.take()).flatten();
-        let socket_addr_v6 = Default::default();
-        let relay_server = String::new();
-        let webrtc_sdp_answer = String::new();
-        use hbb_common::protobuf::Enum;
-        let nat_type = NatType::from_i32(Config::get_nat_type()).unwrap_or(NatType::UNKNOWN_NAT);
-        let msg_punch = PunchHoleSent {
-            socket_addr: ph.socket_addr,
-            id: Config::get_id(),
-            relay_server,
-            nat_type: nat_type.into(),
-            version: crate::VERSION.to_owned(),
-            socket_addr_v6,
-            webrtc_sdp_answer,
-            ..Default::default()
-        };
-        if ph.udp_port > 0 {
-            peer_addr.set_port(ph.udp_port as u16);
-            self.punch_udp_hole(peer_addr, server, msg_punch, meta, slot_udp)
-                .await?;
-            return Ok(());
-        }
-        log::debug!("Punch tcp hole to {:?}", peer_addr);
-        let mut socket = {
-            let socket = connect_tcp(&*self.host, CONNECT_TIMEOUT).await?;
-            let local_addr = socket.local_addr();
-            // key important here for punch hole to tell my gateway incoming peer is safe.
-            // Awaited rather than spawned so the mapping exists before `PunchHoleSent` goes out;
-            // `local_addr` itself is shared, not exclusive - every socket here binds it with the
-            // reuse flags `new_socket` sets.
-            allow_err!(socket_client::connect_tcp_local(peer_addr, Some(local_addr), 30).await);
-            socket
-        };
-        let mut msg_out = Message::new();
-        msg_out.set_punch_hole_sent(msg_punch);
-        let bytes = msg_out.write_to_bytes()?;
-        socket.send_raw(bytes).await?;
-        let local_addr = socket.local_addr();
-        // The listener inside takes this address over, so the mediator's socket goes first.
-        drop(socket);
-        // The reply went out above: declined is the listen alone, so the controller's TCP attempt
-        // meets nothing and its v6 one goes on.
-        let Some(slot) = slot_tcp else {
-            hbb_common::throttled_log!(
-                PUNCH_LOG_INTERVAL,
-                warn,
-                "declined a TCP punch: {} TCP punches already in flight",
-                TCP_PUNCHES.max
-            );
-            return Ok(());
-        };
-        punch_tcp_until_connected(server, peer_addr, local_addr, meta, slot).await;
-        Ok(())
+    async fn handle_punch_hole(
+        &self,
+        _ph: PunchHole,
+        _server: ServerPtr,
+    ) -> ResultType<()> {
+        // eDesk sessions are initiated directly from the LAN discovery cache.
+        // Rendezvous punch, WebRTC/ICE and IPv6 paths are never used.
+        bail!("eDesk LAN-only mode blocks rendezvous punch requests.");
     }
 
     async fn punch_udp_hole(
