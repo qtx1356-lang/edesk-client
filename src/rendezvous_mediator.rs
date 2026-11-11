@@ -769,9 +769,6 @@ impl RendezvousMediator {
 
     async fn handle_intranet(&self, fla: FetchLocalAddr, server: ServerPtr) -> ResultType<()> {
         let peer_addr = AddrMangle::decode(&fla.socket_addr);
-        if !crate::edesk_network::is_allowed_lan_ip(peer_addr.ip()) {
-            bail!("eDesk LAN-only mode rejected a non-local intranet request.");
-        }
         let last = *LAST_MSG.lock().await;
         *LAST_MSG.lock().await = (peer_addr, Instant::now());
         if last.0 == peer_addr && last.1.elapsed().as_millis() < 100 {
@@ -824,6 +821,9 @@ impl RendezvousMediator {
         // we saw invalid local_addr while using proxy, local_addr.ip() == "::1"
         let local_addr: SocketAddr =
             format!("{}:{}", local_addr.ip(), local_addr.port()).parse()?;
+        if !crate::edesk_network::is_allowed_lan_ip(local_addr.ip()) {
+            bail!("eDesk LAN-only mode rejected a non-local listener interface.");
+        }
         let mut msg_out = Message::new();
         msg_out.set_local_addr(LocalAddr {
             id: Config::get_id(),
