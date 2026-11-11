@@ -35,9 +35,10 @@ pub(super) fn start_listening() -> ResultType<()> {
             if let Ok(msg_in) = Message::parse_from_bytes(&buf[0..len]) {
                 match msg_in.union {
                     Some(rendezvous_message::Union::PeerDiscovery(p)) => {
-                        if p.cmd == "ping"
-                            && crate::edesk_network::is_allowed_lan_ip(addr.ip())
-                        {
+                        if let Some(nonce) = p.cmd.strip_prefix("ping:").filter(|n| !n.is_empty()) {
+                            if !crate::edesk_network::is_allowed_lan_ip(addr.ip()) {
+                                continue;
+                            }
                             let id = Config::get_id();
                             if p.id == id {
                                 continue;
@@ -50,7 +51,7 @@ pub(super) fn start_listening() -> ResultType<()> {
                                     hostname = "unknown".to_owned();
                                 }
                                 let peer = PeerDiscovery {
-                                    cmd: "pong".to_owned(),
+                                    cmd: format!("pong:{}", nonce),
                                     mac: get_mac(&self_addr),
                                     id,
                                     hostname,
@@ -72,8 +73,8 @@ pub(super) fn start_listening() -> ResultType<()> {
 
 #[tokio::main(flavor = "current_thread")]
 pub async fn discover() -> ResultType<()> {
-    let sockets = send_query()?;
-    let rx = spawn_wait_responses(sockets);
+    let (sockets, nonce) = send_query()?;
+    let rx = spawn_wait_responses(sockets, nonce);
     handle_received_peers(rx).await?;
 
     log::info!("discover ping done");
@@ -182,7 +183,7 @@ fn create_broadcast_sockets() -> Vec<UdpSocket> {
     sockets
 }
 
-fn send_query() -> ResultType<Vec<UdpSocket>> {
+fn send_query() -> ResultType<(Vec<UdpSocket>, String)> {
     let sockets = create_broadcast_sockets();
     if sockets.is_empty() {
         bail!("Found no bindable ipv4 addresses");
@@ -200,8 +201,9 @@ fn send_query() -> ResultType<Vec<UdpSocket>> {
     // We can use the mac address to identify the device.
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let id = "".to_owned();
+    let nonce = uuid::Uuid::new_v4().to_string();
     let peer = PeerDiscovery {
-        cmd: "ping".to_owned(),
+        cmd: format!("ping:{}", nonce),
         id,
         ..Default::default()
     };
@@ -212,13 +214,14 @@ fn send_query() -> ResultType<Vec<UdpSocket>> {
         allow_err!(socket.send_to(&out, maddr));
     }
     log::info!("discover ping sent");
-    Ok(sockets)
+    Ok((sockets, nonce))
 }
 
 fn wait_response(
     socket: UdpSocket,
     timeout: Option<std::time::Duration>,
     tx: UnboundedSender<config::DiscoveryPeer>,
+    nonce: String,
 ) -> ResultType<()> {
     let mut last_recv_time = Instant::now();
 
@@ -237,7 +240,7 @@ fn wait_response(
                 match msg_in.union {
                     Some(rendezvous_message::Union::PeerDiscovery(p)) => {
                         last_recv_time = Instant::now();
-                        if p.cmd == "pong" {
+                        if p.cmd == format!("pong:{}", nonce) {
                             if !crate::common::is_valid_untrusted_peer_id(&p.id) {
                                 log::warn!(
                                     "Ignoring LAN discovery response from {} with invalid peer id",
@@ -292,15 +295,20 @@ fn wait_response(
     Ok(())
 }
 
-fn spawn_wait_responses(sockets: Vec<UdpSocket>) -> UnboundedReceiver<config::DiscoveryPeer> {
+fn spawn_wait_responses(
+    sockets: Vec<UdpSocket>,
+    nonce: String,
+) -> UnboundedReceiver<config::DiscoveryPeer> {
     let (tx, rx) = unbounded_channel::<_>();
     for socket in sockets {
         let tx_clone = tx.clone();
+        let nonce = nonce.clone();
         std::thread::spawn(move || {
             allow_err!(wait_response(
                 socket,
                 Some(std::time::Duration::from_millis(10)),
-                tx_clone
+                tx_clone,
+                nonce
             ));
         });
     }
