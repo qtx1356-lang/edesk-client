@@ -127,6 +127,12 @@ jobs:
           python3 .\build.py --portable --flutter --skip-portable-pack
           Move-Item ./flutter/build/windows/x64/runner/Release ./edesk-baseline
 
+      - name: Add RustDesk temporary topmost window helper
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: topmostwindow-artifacts-x64
+          path: ./edesk-baseline
+
       - name: Report package size
         shell: powershell
         run: |
@@ -134,12 +140,6 @@ jobs:
           $total = ($files | Measure-Object -Property Length -Sum).Sum
           Write-Host ("Unpacked application size: {0:N2} MB" -f ($total / 1MB))
           $files | Sort-Object Length -Descending | Select-Object -First 15 FullName, Length | Format-Table -AutoSize
-
-      - name: Add RustDesk temporary topmost window helper
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: topmostwindow-artifacts-x64
-          path: ./edesk-baseline
 
       - name: Upload unsigned eDesk baseline
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
