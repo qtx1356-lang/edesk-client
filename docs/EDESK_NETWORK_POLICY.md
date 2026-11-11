@@ -1,6 +1,6 @@
 # eDesk Same-LAN-Only Connection Policy
 
-**Status:** Product requirement; implementation pending.
+**Status:** Prototype connection gates committed to `edesk-work`; not yet validated for production.
 
 ## Goal
 
@@ -59,6 +59,18 @@ If the network cannot be verified, use the same message with a short explanation
 7. A spoofed or replayed discovery response does not bypass peer authentication.
 8. Screen, input, file transfer, and voice are all unavailable until the LAN policy and user-approval checks pass.
 
+## Current implementation state
+
+The current eDesk branch now has an initial connection-layer gate:
+
+- Outgoing connections are resolved only from the LAN discovery cache. An ID by itself no longer proceeds to the normal rendezvous path.
+- A discovered peer is contacted directly over TCP only when its IPv4 address is private and matches a private IPv4 subnet on a local interface.
+- Incoming TCP sessions are rejected unless the source address passes the same private-subnet check.
+- Relay-connection creation fails closed.
+- The LAN discovery responder is started in portable desktop mode as well as installed-service mode.
+
+This is a **first enforcement layer, not final LAN verification**. The current implementation does not yet use a fresh challenge/nonce, does not cryptographically prove the peer is on the same Layer-2 broadcast domain, and does not revalidate an active session after network-interface changes. A routed private network or VPN that forwards LAN broadcasts may still require additional controls. Do not describe this build as production-secure until the remaining checks and acceptance tests pass.
+
 ## Implementation note
 
-This policy must be implemented at the connection-establishment/routing layer, not only in the UI. Hiding relay settings or showing a warning while leaving relay fallback active is insufficient. First inspect the pinned RustDesk revision's rendezvous, direct-IP, relay selection, and reconnect paths; then add the smallest upstream-compatible policy gate and automated tests.
+Keep policy enforcement at the connection-establishment/routing layer, not only in the UI. Continue with a challenge-response discovery handshake, explicit transport-path verification, active-session revalidation, and automated tests for same-LAN, routed private networks, VPN/overlay, guest Wi-Fi, and relay rejection. Preserve RustDesk peer authentication and encryption throughout.
