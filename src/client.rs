@@ -436,8 +436,61 @@ impl Client {
         if config::is_incoming_only() && !is_switch_sides_back(conn_type, &interface).await {
             bail!("Incoming only mode");
         }
-        // to-do: remember the port for each peer, so that we can retry easier
+        // eDesk only connects to a peer that is reachable on a private IPv4
+        // subnet shared with one of this machine's local interfaces. A discovered
+        // peer ID is resolved from the LAN discovery cache and connected directly;
+        // no rendezvous server or relay is contacted.
         if hbb_common::is_ip_str(peer) {
+            let peer_ip = peer.parse::<std::net::IpAddr>()?;
+            if !crate::edesk_network::is_allowed_lan_ip(peer_ip) {
+                bail!("Connection blocked. Connect both computers to the same Wi-Fi or wired LAN network.");
+            }
+            return Ok((
+                (
+                    connect_tcp_local(check_port(peer, RELAY_PORT + 1), None, CONNECT_TIMEOUT)
+                        .await?,
+                    true,
+                    None,
+                    None,
+                    "TCP",
+                ),
+                (0, "".to_owned()),
+                false,
+            ));
+        }
+
+        if hbb_common::is_domain_port_str(peer) {
+            bail!("Connection blocked. eDesk accepts only direct connections to devices on the same local network.");
+        }
+
+        let discovered_peer = config::LanPeers::load()
+            .peers
+            .into_iter()
+            .find(|lan_peer| lan_peer.id == peer && lan_peer.online);
+        if let Some(discovered_peer) = discovered_peer {
+            for (ip, _mac) in discovered_peer.ip_mac {
+                let Ok(peer_ip) = ip.parse::<std::net::IpAddr>() else {
+                    continue;
+                };
+                if !crate::edesk_network::is_allowed_lan_ip(peer_ip) {
+                    continue;
+                }
+                let endpoint = format!("{}:{}", ip, RELAY_PORT + 1);
+                match connect_tcp_local(&endpoint, None, CONNECT_TIMEOUT).await {
+                    Ok(stream) => {
+                        return Ok((
+                            (stream, true, None, None, "TCP"),
+                            (0, "".to_owned()),
+                            false,
+                        ));
+                    }
+                    Err(err) => log::debug!("LAN direct connection to {} failed: {}", endpoint, err),
+                }
+            }
+        }
+
+        bail!("Connection blocked. This device is not available on the same local network. Open the LAN devices tab to refresh discovery.");
+
             return Ok((
                 (
                     connect_tcp_local(check_port(peer, RELAY_PORT + 1), None, CONNECT_TIMEOUT)
