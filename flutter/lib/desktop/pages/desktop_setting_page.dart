@@ -1500,7 +1500,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
 
   List<Widget> directIp(BuildContext context) {
     return [
-      const Text('eDesk connects only to authenticated devices found in the LAN devices list.'),
+      const Text('eDesk connects only to discovered LAN devices. Internet signaling is used; session traffic stays direct on the LAN.'),
     ];
   }
 
