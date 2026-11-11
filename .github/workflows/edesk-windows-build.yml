@@ -1,6 +1,8 @@
 name: eDesk Windows x64 baseline build
 
 on:
+  push:
+    branches: [edesk-work]
   workflow_dispatch:
 
 permissions:
