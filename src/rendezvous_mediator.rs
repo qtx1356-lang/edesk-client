@@ -310,17 +310,14 @@ impl RendezvousMediator {
     }
 
     pub async fn start_all() {
-        crate::test_nat_type();
+        // LAN-only sessions do not need public STUN/NAT probing.
         if config::is_outgoing_only() {
             loop {
                 sleep(1.).await;
             }
         }
         crate::hbbs_http::sync::start();
-        #[cfg(target_os = "windows")]
-        if crate::platform::is_installed() && crate::is_server() {
-            crate::updater::start_auto_update();
-        }
+        // eDesk uses its own updater; never start the upstream RustDesk updater here.
         check_zombie();
         let server = new_server();
         if config::option2bool("stop-service", &Config::get_option("stop-service")) {
