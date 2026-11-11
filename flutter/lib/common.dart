@@ -3061,7 +3061,7 @@ int versionCmp(String v1, String v2) {
 }
 
 String getWindowName({WindowType? overrideType}) {
-  final name = bind.mainGetAppNameSync();
+  // eDesk keeps the upstream core identity internally, but presents its own product name.\n  const name = "eDesk";
   switch (overrideType ?? kWindowType) {
     case WindowType.Main:
       return name;
