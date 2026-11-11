@@ -403,11 +403,9 @@ WindowOptions getHiddenTitleBarWindowOptions(
     Size? size,
     bool center = false,
     bool? alwaysOnTop}) {
-  var defaultTitleBarStyle = TitleBarStyle.hidden;
-  // we do not hide titlebar on win7 because of the frame overflow.
-  if (kUseCompatibleUiMode) {
-    defaultTitleBarStyle = TitleBarStyle.normal;
-  }
+  // eDesk uses the standard native title bar so the product name and
+  // Windows window controls remain visible.
+  var defaultTitleBarStyle = TitleBarStyle.normal;
   return WindowOptions(
     size: size,
     center: center,
