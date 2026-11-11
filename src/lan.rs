@@ -35,7 +35,9 @@ pub(super) fn start_listening() -> ResultType<()> {
             if let Ok(msg_in) = Message::parse_from_bytes(&buf[0..len]) {
                 match msg_in.union {
                     Some(rendezvous_message::Union::PeerDiscovery(p)) => {
-                        if p.cmd == "ping" {
+                        if p.cmd == "ping"
+                            && crate::edesk_network::is_allowed_lan_ip(addr.ip())
+                        {
                             let id = Config::get_id();
                             if p.id == id {
                                 continue;
