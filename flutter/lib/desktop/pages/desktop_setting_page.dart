@@ -1455,8 +1455,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
     bool enabled = !locked;
     return _Card(title: 'Security', children: [
       shareRdp(context, enabled),
-      _OptionCheckBox(context, 'Deny LAN discovery', 'enable-lan-discovery',
-          reverse: true, enabled: enabled),
+      const Text('LAN discovery is required for eDesk same-network connections.'),
       ...directIp(context),
       whitelist(),
       idWhitelist(),
