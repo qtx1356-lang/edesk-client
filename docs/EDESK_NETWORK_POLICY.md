@@ -67,9 +67,10 @@ The current eDesk branch now has an initial connection-layer gate:
 - A discovered peer is contacted directly over TCP only when its IPv4 address is private and matches a private IPv4 subnet on a local interface.
 - Incoming TCP sessions are rejected unless the source address passes the same private-subnet check.
 - Relay-connection creation fails closed.
-- The LAN discovery responder is started in portable desktop mode as well as installed-service mode.
+- The LAN discovery responder is started in portable desktop mode as well as installed-service mode, and discovery requests carry a fresh UUID nonce that must be echoed in the response.
+- Discovery responses are served only to sources that pass the local private-subnet check.
 
-This is a **first enforcement layer, not final LAN verification**. The current implementation does not yet use a fresh challenge/nonce, does not cryptographically prove the peer is on the same Layer-2 broadcast domain, and does not revalidate an active session after network-interface changes. A routed private network or VPN that forwards LAN broadcasts may still require additional controls. Do not describe this build as production-secure until the remaining checks and acceptance tests pass.
+This is a **first enforcement layer, not final LAN verification**. The nonce reduces acceptance of stale/replayed discovery responses, but does not authenticate the responder or cryptographically prove the peer is on the same Layer-2 broadcast domain, and does not revalidate an active session after network-interface changes. A routed private network or VPN that forwards LAN broadcasts may still require additional controls. Do not describe this build as production-secure until the remaining checks and acceptance tests pass.
 
 ## Implementation note
 
