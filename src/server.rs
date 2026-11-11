@@ -401,35 +401,16 @@ pub async fn create_relay_connection(
 }
 
 async fn create_relay_connection_(
-    server: ServerPtr,
-    relay_server: String,
-    uuid: String,
-    peer_addr: SocketAddr,
-    secure: bool,
-    ipv4: bool,
-    meta: ConnectionMeta,
+    _server: ServerPtr,
+    _relay_server: String,
+    _uuid: String,
+    _peer_addr: SocketAddr,
+    _secure: bool,
+    _ipv4: bool,
+    _meta: ConnectionMeta,
 ) -> ResultType<()> {
-    // eDesk is a LAN-only client: relay paths are never an acceptable fallback.
+    // eDesk is LAN-only; never open an internet relay transport.
     bail!("eDesk LAN-only mode blocks relay connections.");
-
-    // The proxy's address family does not constrain the relay target.
-    let relay_server = crate::check_port(relay_server, RELAY_PORT);
-    let use_ws_proxy = Config::is_proxy() && is_ws_endpoint(&check_ws(&relay_server));
-    let mut stream = socket_client::connect_tcp(
-        socket_client::ipv4_to_ipv6(relay_server, ipv4 || use_ws_proxy),
-        CONNECT_TIMEOUT,
-    )
-    .await?;
-    let mut msg_out = RendezvousMessage::new();
-    let licence_key = crate::get_key(true).await;
-    msg_out.set_request_relay(RequestRelay {
-        licence_key,
-        uuid,
-        ..Default::default()
-    });
-    stream.send(&msg_out).await?;
-    create_tcp_connection(server, stream, peer_addr, secure, meta).await?;
-    Ok(())
 }
 
 impl Server {
