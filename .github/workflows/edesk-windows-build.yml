@@ -122,13 +122,13 @@ jobs:
       - name: Build Windows Flutter application
         shell: powershell
         run: |
-          python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec --vram
+          python3 .\build.py --portable --flutter --skip-portable-pack
           Move-Item ./flutter/build/windows/x64/runner/Release ./edesk-baseline
 
       - name: Report package size
         shell: powershell
         run: |
-          $files = Get-ChildItem .\\edesk-baseline -Recurse -File
+          $files = Get-ChildItem .\edesk-baseline -Recurse -File
           $total = ($files | Measure-Object -Property Length -Sum).Sum
           Write-Host ("Unpacked application size: {0:N2} MB" -f ($total / 1MB))
           $files | Sort-Object Length -Descending | Select-Object -First 15 FullName, Length | Format-Table -AutoSize
