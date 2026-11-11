@@ -30,7 +30,6 @@ pub(crate) fn is_allowed_lan_ip(ip: IpAddr) -> bool {
         return false;
     }
 
-    let peer_bits = u32::from(peer);
     default_net::get_interfaces().iter().any(|interface| {
         is_allowed_lan_interface(interface)
             && interface.ipv4.iter().any(|local| {
@@ -64,7 +63,7 @@ pub(crate) fn is_allowed_lan_ip(_ip: IpAddr) -> bool {
     false
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "ios")))]
 mod tests {
     use super::*;
 
