@@ -474,11 +474,7 @@ impl Client {
             }
         };
 
-        // Same relay gate as the v6 socket below: under any forced relay the v6 punch cannot
-        // be used, so probing v6 reachability is wasted work on every such connection.
-        if crate::get_ipv6_punch_enabled() && !interface.is_force_relay() {
-            crate::test_ipv6().await;
-        }
+        // eDesk does not probe or use IPv6 for remote sessions.
 
         let (stop_udp_tx, stop_udp_rx) = oneshot::channel::<()>();
         let udp =
