@@ -332,8 +332,10 @@ impl RendezvousMediator {
         });
         #[cfg(target_os = "android")]
         let start_lan_listening = true;
+        // eDesk must answer LAN discovery requests in portable mode too; otherwise
+        // two computers running the portable app cannot discover one another.
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        let start_lan_listening = crate::platform::is_installed();
+        let start_lan_listening = true;
         if start_lan_listening {
             std::thread::spawn(move || {
                 allow_err!(super::lan::start_listening());
