@@ -700,36 +700,12 @@ impl RendezvousMediator {
         }
     }
 
-    async fn handle_request_relay(&self, _rr: RequestRelay, _server: ServerPtr) -> ResultType<()> {
+    async fn handle_request_relay(
+        &self,
+        _rr: RequestRelay,
+        _server: ServerPtr,
+    ) -> ResultType<()> {
         bail!("eDesk LAN-only mode blocks relay requests.");
-        if let Err(err) = self.check_relay_request(&_rr, Instant::now()) {
-            hbb_common::throttled_log!(PUNCH_LOG_INTERVAL, warn, "Ignored relay request: {}", err);
-            return Ok(());
-        }
-        let addr = AddrMangle::decode(&rr.socket_addr);
-        let last = *LAST_RELAY_MSG.lock().await;
-        *LAST_RELAY_MSG.lock().await = (addr, Instant::now());
-        // skip duplicate relay request messages
-        if last.0 == addr && last.1.elapsed().as_millis() < 100 {
-            return Ok(());
-        }
-        let meta = connection_meta(
-            rr.control_permissions.into_option(),
-            rr.controlled_context.into_option(),
-        );
-
-        self.create_relay(
-            rr.socket_addr.into(),
-            rr.relay_server,
-            rr.uuid,
-            server,
-            rr.secure,
-            false,
-            Default::default(),
-            String::new(),
-            meta,
-        )
-        .await
     }
 
     async fn create_relay(
