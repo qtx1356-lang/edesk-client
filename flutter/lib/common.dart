@@ -3853,7 +3853,19 @@ class _LogoState extends State<_Logo> {
             child: image,
           ).marginOnly(left: 12, right: 12, top: 12);
         }
-        return const Offstage();
+        return Container(
+          constraints: const BoxConstraints(maxWidth: 300, maxHeight: 60),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          child: const Text(
+            'eDesk',
+            style: TextStyle(
+              fontSize: 34,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
+        );
       },
     );
   }
