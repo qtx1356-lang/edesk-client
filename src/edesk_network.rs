@@ -12,7 +12,7 @@ pub(crate) fn is_allowed_lan_ip(ip: IpAddr) -> bool {
         IpAddr::V6(_) => return false,
     };
 
-    if !peer.is_private() || peer.is_loopback() || peer.is_link_local() {
+    if !peer.is_private() || peer.is_loopback() || is_ipv4_link_local(peer) {
         return false;
     }
 
@@ -24,10 +24,15 @@ pub(crate) fn is_allowed_lan_ip(ip: IpAddr) -> bool {
             mask != 0
                 && local_ip.is_private()
                 && !local_ip.is_loopback()
-                && !local_ip.is_link_local()
+                && !is_ipv4_link_local(local_ip)
                 && (u32::from(local_ip) & mask) == (peer_bits & mask)
         })
     })
+}
+
+fn is_ipv4_link_local(ip: Ipv4Addr) -> bool {
+    let octets = ip.octets();
+    octets[0] == 169 && octets[1] == 254
 }
 
 #[cfg(test)]
