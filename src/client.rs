@@ -437,6 +437,7 @@ impl Client {
             bail!("Incoming only mode");
         }
         // eDesk sessions must originate from a peer seen in fresh LAN discovery.
+        // All session transports remain peer-to-peer after rendezvous identity verification.
         if hbb_common::is_ip_str(peer) || hbb_common::is_domain_port_str(peer) {
             bail!("Use the LAN devices list to connect in eDesk.");
         }
