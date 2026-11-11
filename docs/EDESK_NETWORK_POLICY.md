@@ -69,6 +69,7 @@ The current eDesk branch now has an initial connection-layer gate:
 - Relay-connection creation fails closed.
 - The LAN discovery responder is started in portable desktop mode as well as installed-service mode, and discovery requests carry a fresh UUID nonce that must be echoed in the response.
 - Discovery responses are served only to sources that pass the local private-subnet check.
+- LAN discovery broadcasts and subnet validation now ignore adapters reported as down, loopback, point-to-point, or tunnel interfaces, reducing accidental use of VPN/tunnel adapters.
 
 This is a **first enforcement layer, not final LAN verification**. The nonce reduces acceptance of stale/replayed discovery responses, but does not authenticate the responder or cryptographically prove the peer is on the same Layer-2 broadcast domain, and does not revalidate an active session after network-interface changes. A routed private network or VPN that forwards LAN broadcasts may still require additional controls. Do not describe this build as production-secure until the remaining checks and acceptance tests pass.
 
