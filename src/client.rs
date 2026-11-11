@@ -1002,10 +1002,8 @@ impl Client {
                                 .into_iter()
                                 .find(|lan_peer| lan_peer.id == peer && lan_peer.online)
                                 .ok_or_else(|| anyhow!("Peer is no longer present in LAN discovery"))?;
-                            let peer_ip = peer_addr.ip().to_string();
                             if !is_local
                                 || !crate::edesk_network::is_allowed_lan_ip(peer_addr.ip())
-                                || !discovered_peer.ip_mac.contains_key(&peer_ip)
                             {
                                 bail!("Connection blocked. The peer is not verified on the same local network.");
                             }
