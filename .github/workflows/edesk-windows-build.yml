@@ -23,6 +23,8 @@ env:
 jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
+    with:
+      windows_x64_only: true
 
   build-topmost-window:
     uses: ./.github/workflows/third-party-RustDeskTempTopMostWindow.yml
