@@ -8,6 +8,10 @@ on:
     tags:
       - "edesk-v*"
 
+concurrency:
+  group: edesk-windows-build
+  cancel-in-progress: true
+
 permissions:
   contents: read
   actions: read
