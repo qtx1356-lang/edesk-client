@@ -770,62 +770,13 @@ impl RendezvousMediator {
         Ok(())
     }
 
-    async fn handle_intranet(&self, fla: FetchLocalAddr, server: ServerPtr) -> ResultType<()> {
-        let addr = AddrMangle::decode(&fla.socket_addr);
-        let last = *LAST_MSG.lock().await;
-        *LAST_MSG.lock().await = (addr, Instant::now());
-        // skip duplicate punch hole messages
-        if last.0 == addr && last.1.elapsed().as_millis() < 100 {
-            return Ok(());
-        }
-        let peer_addr_v6 = hbb_common::AddrMangle::decode(&fla.socket_addr_v6);
-        let relay_server = self.get_relay_server(fla.relay_server.clone());
-        remember_reported_relay(&relay_server, Instant::now());
-        let relay = use_ws() || Config::is_proxy();
-        let mut socket_addr_v6 = Default::default();
-        let meta = connection_meta(
-            fla.control_permissions.clone().into_option(),
-            fla.controlled_context.clone().into_option(),
-        );
-        if peer_addr_v6.port() > 0 && !relay {
-            socket_addr_v6 = start_ipv6(
-                peer_addr_v6,
-                addr,
-                server.clone(),
-                meta.clone(),
-                UDP_PUNCHES.take(),
-            )
-            .await;
-        }
-        if is_ipv4(&self.addr) && !relay && !config::is_disable_tcp_listen() {
-            if let Err(err) = self
-                .handle_intranet_(
-                    fla.clone(),
-                    server.clone(),
-                    relay_server.clone(),
-                    socket_addr_v6.clone(),
-                    meta.clone(),
-                )
-                .await
-            {
-                log::debug!("Failed to handle intranet: {:?}, will try relay", err);
-            } else {
-                return Ok(());
-            }
-        }
-        let uuid = Uuid::new_v4().to_string();
-        self.create_relay(
-            fla.socket_addr.into(),
-            relay_server,
-            uuid,
-            server,
-            true,
-            true,
-            socket_addr_v6,
-            String::new(),
-            meta,
-        )
-        .await
+    async fn handle_intranet(
+        &self,
+        _fla: FetchLocalAddr,
+        _server: ServerPtr,
+    ) -> ResultType<()> {
+        // eDesk does not use rendezvous local-address exchange or its relay fallback.
+        bail!("eDesk LAN-only mode blocks rendezvous intranet fallback.");
     }
 
     async fn handle_intranet_(
