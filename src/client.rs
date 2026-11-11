@@ -500,13 +500,8 @@ impl Client {
         } else {
             (None, None)
         };
-        // Under force-relay a direct IPv6 path is not allowed, so don't bind the v6 socket;
-        // the controlled side likewise skips v6 when relaying.
-        let ipv6 = if crate::get_ipv6_punch_enabled() && !interface.is_force_relay() {
-            crate::get_ipv6_socket().await
-        } else {
-            None
-        };
+        // eDesk LAN sessions use IPv4 discovery and IPv4 direct punches only.
+        let ipv6 = None;
         // WebRTC uses its own ICE sockets and does not depend on the legacy UDP punch socket.
         // When this request carries an offer, `_start_inner` keeps its rendezvous socket solely
         // for trickle signaling; a separate offer-less request owns any TCP punch attempt.
