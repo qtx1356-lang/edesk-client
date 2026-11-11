@@ -1074,90 +1074,30 @@ impl RendezvousMediator {
         if last.0 == peer_addr && last.1.elapsed().as_millis() < 100 {
             return Ok(());
         }
-        let peer_addr_v6 = hbb_common::AddrMangle::decode(&ph.socket_addr_v6);
         let local_proxy = use_ws() || Config::is_proxy();
         let relay = local_proxy || ph.force_relay;
-        let mut socket_addr_v6 = Default::default();
         let meta = connection_meta(
             ph.control_permissions.clone().into_option(),
             ph.controlled_context.clone().into_option(),
         );
-        // The controller's force_relay alone does not say whether ICE must be Relay-only; its
-        // offer envelope does. `ice_policy: "all"` means the relay was forced by the transport
-        // (ws), so answer with full ICE and let a direct pair form.
-        let webrtc_relay_only =
-            ph.force_relay && !WebRTCStream::endpoint_declares_all_ice(&ph.webrtc_sdp_offer);
-        // No enable-webrtc check here: it is LocalConfig, which the UI process writes and never
-        // syncs over IPC, so this (server) process would read the private-server default of "N"
-        // and refuse to answer in exactly the self-hosted deployments the transport is for.
-        // A proxy still rules it out — ICE would bypass it and leak the real IP.
-        let webrtc_viable = !ph.webrtc_sdp_offer.is_empty()
-            && !Config::is_proxy()
-            && (!webrtc_relay_only || WebRTCStream::has_turn_server());
-        let webrtc_sdp_answer = if webrtc_viable {
-            self.spawn_webrtc_answerer(
-                &ph,
-                webrtc_relay_only,
-                server.clone(),
-                peer_addr,
-                meta.clone(),
-            )
-            .await
-            .unwrap_or_else(|err| {
-                log::warn!("failed to create WebRTC answer: {}", err);
-                String::new()
-            })
-        } else {
-            String::new()
-        };
-        // Whether the v4 legs relay is known here, and decides whether a v4 place is taken at
-        // all: the relay branch below runs the whole session, and a place held across it would
-        // let ordinary relay traffic use the pool up. The v6 punch is not relayed with them - a
-        // symmetric NAT on v4 says nothing about v6 - and its place is taken after the v4 one,
-        // or it could be the last and leave the punch the peer counts on with none.
+
+        // eDesk accepts direct IPv4 TCP/UDP only. Do not create WebRTC/ICE
+        // answerers (which could select TURN), IPv6 paths, or relay fallbacks.
         let relay_v4 = ph.nat_type.enum_value() == Ok(NatType::SYMMETRIC)
             || Config::get_nat_type() == NatType::SYMMETRIC as i32
             || relay
             || (config::is_disable_tcp_listen() && ph.udp_port <= 0);
-        let punch_udp = !relay_v4 && ph.udp_port > 0;
-        let punch_tcp = !relay_v4 && ph.udp_port <= 0 && ph.webrtc_sdp_offer.is_empty();
-        let punch_v6 = peer_addr_v6.port() > 0 && !relay;
-        let (slot_udp, slot_v6) = UDP_PUNCHES.take_pair(punch_udp, punch_v6);
-        let slot_tcp = punch_tcp.then(|| TCP_PUNCHES.take()).flatten();
-        if punch_v6 {
-            socket_addr_v6 = start_ipv6(
-                peer_addr_v6,
-                peer_addr,
-                server.clone(),
-                meta.clone(),
-                slot_v6,
-            )
-            .await;
-        }
-        let relay_server = self.get_relay_server(ph.relay_server);
-        remember_reported_relay(&relay_server, Instant::now());
-        // for ensure, websocket go relay directly
-        // A symmetric NAT relays the legacy transports but deliberately not WebRTC: the answer
-        // built above rides along on the relay request, and ICE probes the candidate pairs rather
-        // than trusting this classification, so a direct WebRTC pair can still form on a
-        // connection this branch has already called relay-only. Do not gate the answerer on
-        // nat_type to make the two agree.
         if relay_v4 {
-            let uuid = Uuid::new_v4().to_string();
-            return self
-                .create_relay(
-                    ph.socket_addr.into(),
-                    relay_server,
-                    uuid,
-                    server,
-                    true,
-                    true,
-                    socket_addr_v6.clone(),
-                    webrtc_sdp_answer.clone(),
-                    meta,
-                )
-                .await;
+            bail!("eDesk LAN-only mode blocks relay fallback.");
         }
+
+        let punch_udp = ph.udp_port > 0;
+        let punch_tcp = ph.udp_port <= 0;
+        let (slot_udp, _slot_v6) = UDP_PUNCHES.take_pair(punch_udp, false);
+        let slot_tcp = punch_tcp.then(|| TCP_PUNCHES.take()).flatten();
+        let socket_addr_v6 = Default::default();
+        let relay_server = String::new();
+        let webrtc_sdp_answer = String::new();
         use hbb_common::protobuf::Enum;
         let nat_type = NatType::from_i32(Config::get_nat_type()).unwrap_or(NatType::UNKNOWN_NAT);
         let msg_punch = PunchHoleSent {
@@ -1174,20 +1114,6 @@ impl RendezvousMediator {
             peer_addr.set_port(ph.udp_port as u16);
             self.punch_udp_hole(peer_addr, server, msg_punch, meta, slot_udp)
                 .await?;
-            return Ok(());
-        }
-        if !ph.webrtc_sdp_offer.is_empty() {
-            // Return the answer over its own short-lived TCP connection rather than the mediator
-            // channel: that channel is UDP by default, and hbbs applies UDP-punch semantics
-            // (source-address observation) to a PunchHoleSent that arrives on it. No TCP punch
-            // is made — the controller keeps its request socket for trickled ICE.
-            let mut msg_out = Message::new();
-            msg_out.set_punch_hole_sent(msg_punch);
-            let mut socket = connect_tcp(&*self.host, CONNECT_TIMEOUT).await?;
-            // The answer goes out only on a channel that is actually encrypted; otherwise this
-            // WebRTC attempt is abandoned and the controller falls back to its other transports.
-            crate::secure_tcp_required(&mut socket, &crate::get_key(true).await).await?;
-            socket.send(&msg_out).await?;
             return Ok(());
         }
         log::debug!("Punch tcp hole to {:?}", peer_addr);
