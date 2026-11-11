@@ -997,7 +997,7 @@ impl Client {
                             signed_id_pk = ph.pk.into();
                             relay_server = ph.relay_server;
                             peer_addr = AddrMangle::decode(&ph.socket_addr);
-                            let discovered_peer = config::LanPeers::load()
+                            let _discovered_peer = config::LanPeers::load()
                                 .peers
                                 .into_iter()
                                 .find(|lan_peer| lan_peer.id == peer && lan_peer.online)
