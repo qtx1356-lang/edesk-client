@@ -166,6 +166,9 @@ fn create_broadcast_sockets() -> Vec<UdpSocket> {
     // `default_net::get_interfaces()` causes undefined symbols error when `flutter build` on iOS simulator x86_64
     #[cfg(not(any(target_os = "ios")))]
     for interface in default_net::get_interfaces() {
+        if !crate::edesk_network::is_allowed_lan_interface(&interface) {
+            continue;
+        }
         for ipv4 in &interface.ipv4 {
             ipv4s.push(ipv4.addr.clone());
         }
