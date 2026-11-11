@@ -418,8 +418,8 @@ impl Client {
     /// Start a new connection.
     async fn _start(
         peer: &str,
-        _key: &str,
-        _token: &str,
+        key: &str,
+        token: &str,
         conn_type: ConnType,
         interface: impl Interface,
     ) -> ResultType<(
@@ -436,52 +436,152 @@ impl Client {
         if config::is_incoming_only() && !is_switch_sides_back(conn_type, &interface).await {
             bail!("Incoming only mode");
         }
-        // eDesk only connects to devices that responded to local LAN discovery.
-        // The peer address must also be on a private IPv4 subnet shared with this
-        // machine. This prevents arbitrary IPs, internet rendezvous and relay fallback.
-        let lan_peers = config::LanPeers::load().peers;
-        let discovered_peer = if hbb_common::is_ip_str(peer) {
-            lan_peers.into_iter().find(|lan_peer| {
-                lan_peer.online && lan_peer.ip_mac.contains_key(peer)
-            })
-        } else if hbb_common::is_domain_port_str(peer) {
-            bail!(
-                "Connection blocked. eDesk accepts only devices discovered on the same local network."
-            );
-        } else {
-            lan_peers
-                .into_iter()
-                .find(|lan_peer| lan_peer.id == peer && lan_peer.online)
-        };
-
-        if let Some(discovered_peer) = discovered_peer {
-            for (ip, _mac) in discovered_peer.ip_mac {
-                let Ok(peer_ip) = ip.parse::<std::net::IpAddr>() else {
-                    continue;
-                };
-                if !crate::edesk_network::is_allowed_lan_ip(peer_ip) {
-                    continue;
-                }
-                let endpoint = format!("{}:{}", ip, RELAY_PORT + 1);
-                match connect_tcp_local(&endpoint, None, CONNECT_TIMEOUT).await {
-                    Ok(stream) => {
-                        return Ok((
-                            (stream, true, None, None, "TCP"),
-                            (0, "".to_owned()),
-                            false,
-                        ));
-                    }
-                    Err(err) => {
-                        log::debug!("LAN direct connection to {} failed: {}", endpoint, err)
-                    }
-                }
-            }
+        // eDesk sessions must originate from a peer seen in fresh LAN discovery.
+        if hbb_common::is_ip_str(peer) || hbb_common::is_domain_port_str(peer) {
+            bail!("Use the LAN devices list to connect in eDesk.");
+        }
+        if !config::LanPeers::load()
+            .peers
+            .iter()
+            .any(|lan_peer| lan_peer.id == peer && lan_peer.online)
+        {
+            bail!("Connection blocked. Refresh the LAN devices list and select a discovered peer.");
+        }
+        if interface.is_force_relay() {
+            bail!("Relay connections are disabled in eDesk LAN-only mode.");
         }
 
-        bail!(
-            "Connection blocked. This device is not available on the same local network. Open the LAN devices tab to refresh discovery."
-        );
+        let other_server = interface.get_lch().read().unwrap().other_server.clone();
+        let (peer, other_server, key, token) = if let Some((a, b, c)) = other_server.as_ref() {
+            (a.as_ref(), b.as_ref(), c.as_ref(), "")
+        } else {
+            (peer, "", key, token)
+        };
+        let (rendezvous_server, servers, contained) = if other_server.is_empty() {
+            crate::get_rendezvous_server(1_000).await
+        } else {
+            if other_server == PUBLIC_SERVER {
+                (
+                    check_port(RENDEZVOUS_SERVERS[0], RENDEZVOUS_PORT),
+                    RENDEZVOUS_SERVERS[1..]
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect(),
+                    true,
+                )
+            } else {
+                (check_port(other_server, RENDEZVOUS_PORT), Vec::new(), true)
+            }
+        };
 
+        // Same relay gate as the v6 socket below: under any forced relay the v6 punch cannot
+        // be used, so probing v6 reachability is wasted work on every such connection.
+        if crate::get_ipv6_punch_enabled() && !interface.is_force_relay() {
+            crate::test_ipv6().await;
+        }
+
+        let (stop_udp_tx, stop_udp_rx) = oneshot::channel::<()>();
+        let udp =
+        // no need to care about multiple rendezvous servers case, since it is acutally not used any more.
+        // Shared state for UDP NAT test result
+        if crate::get_udp_punch_enabled() && !interface.is_force_relay() {
+            if let Ok((socket, addr)) = new_direct_udp_for_unverified(&rendezvous_server).await {
+                let udp_port = Arc::new(Mutex::new(0));
+                let up_cloned = udp_port.clone();
+                let socket_cloned = socket.clone();
+                let func = async move {
+                    allow_err!(test_udp_uat(socket_cloned, addr, up_cloned, stop_udp_rx).await);
+                };
+                tokio::spawn(func);
+                (Some(socket), Some(udp_port))
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+        // Under force-relay a direct IPv6 path is not allowed, so don't bind the v6 socket;
+        // the controlled side likewise skips v6 when relaying.
+        let ipv6 = if crate::get_ipv6_punch_enabled() && !interface.is_force_relay() {
+            crate::get_ipv6_socket().await
+        } else {
+            None
+        };
+        // WebRTC uses its own ICE sockets and does not depend on the legacy UDP punch socket.
+        // When this request carries an offer, `_start_inner` keeps its rendezvous socket solely
+        // for trickle signaling; a separate offer-less request owns any TCP punch attempt.
+        let webrtc_offerer = if Self::should_create_webrtc_offerer(&interface) {
+            // ICE policy follows relay-by-POLICY, not force_relay: under WebSocket the
+            // latter is set for the classic paths, but ICE opens its own sockets and may
+            // still go direct - that is the only P2P path ws deployments have.
+            match WebRTCStream::new("", interface.is_policy_relay(), CONNECT_TIMEOUT).await {
+                Ok(stream) => Some(stream),
+                Err(err) => {
+                    log::warn!("webrtc offerer setup failed: {}", err);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let has_webrtc_offerer = webrtc_offerer.is_some();
+        let fut = Self::_start_inner(
+            peer.to_owned(),
+            key.to_owned(),
+            token.to_owned(),
+            conn_type,
+            interface.clone(),
+            udp.clone(),
+            Some(stop_udp_tx),
+            ipv6,
+            webrtc_offerer,
+            rendezvous_server.clone(),
+            servers.clone(),
+            contained,
+        );
+        // The fallback request exists only to carry a TCP punch, so it is pointless once TCP
+        // punch is off — it would reach `connect()` with nothing to try and just open a second
+        // relay.
+        if interface.is_force_relay()
+            || (udp.0.is_none() && !has_webrtc_offerer)
+            || !tcp_punch_allowed()
+        {
+            return fut.await;
+        }
+        let preferred_fut = fut.boxed();
+        // This is deliberately a pure TCP punch request: its WebRTC argument must stay `None`.
+        // TCP punching closes the rendezvous socket before binding a new connection to the same
+        // local address; a WebRTC ICE bridge would retain that socket and break the port reuse.
+        // The preferred request retains its own socket for WebRTC signaling.
+        let fallback_fut = Self::_start_inner(
+            peer.to_owned(),
+            key.to_owned(),
+            token.to_owned(),
+            conn_type,
+            interface,
+            (None, None),
+            None,
+            None,
+            None,
+            rendezvous_server,
+            servers,
+            contained,
+        )
+        .boxed();
+        if has_webrtc_offerer {
+            return race_transports_prefer_webrtc(
+                preferred_fut,
+                vec![fallback_fut],
+                Self::relay_fallback_delay_ms(),
+                |result| result.0 .1,
+            )
+            .await;
+        }
+        let connect_futures = vec![preferred_fut, fallback_fut];
+        match select_ok(connect_futures).await {
+            Ok(conn) => Ok((conn.0 .0, conn.0 .1, conn.0 .2)),
+            Err(e) => Err(e),
+        }
     }
 
     fn is_expected_webrtc_ice_candidate(ice: &IceCandidate, session_key: &str) -> bool {
@@ -912,6 +1012,20 @@ impl Client {
                             signed_id_pk = ph.pk.into();
                             relay_server = ph.relay_server;
                             peer_addr = AddrMangle::decode(&ph.socket_addr);
+                            let discovered_peer = config::LanPeers::load()
+                                .peers
+                                .into_iter()
+                                .find(|lan_peer| lan_peer.id == peer && lan_peer.online)
+                                .ok_or_else(|| anyhow!("Peer is no longer present in LAN discovery"))?;
+                            let peer_ip = peer_addr.ip().to_string();
+                            if !is_local
+                                || !crate::edesk_network::is_allowed_lan_ip(peer_addr.ip())
+                                || !discovered_peer.ip_mac.contains_key(&peer_ip)
+                            {
+                                bail!("Connection blocked. The peer is not verified on the same local network.");
+                            }
+                            // Never retain a relay endpoint for fallback after local verification.
+                            relay_server.clear();
                             feedback = ph.feedback;
                             webrtc_sdp_answer = ph.webrtc_sdp_answer;
                             let s = udp.0.take();
