@@ -1,62 +1,75 @@
-# eDesk Automatic Update Policy
+# eDesk Automatic Update
 
-**Status:** Product requirement and implementation plan; eDesk-specific release integration pending.
-
-## Goal
-
-Notify users inside the eDesk desktop application when a newer stable eDesk release is available. The user must be able to install it immediately or postpone the reminder.
+**Implementation status:** The Windows x64 update check, in-app notice, verified download flow, and signed-release publishing workflow are connected. The signing secret must be added to the GitHub repository, and the complete flow still needs a successful CI build and a real Windows update test before it is considered production-verified.
 
 ## User experience
 
-When a newer stable version is detected, show a dialog:
+- eDesk checks its own stable GitHub Releases feed at startup and approximately every 24 hours when automatic checks are enabled.
+- A newer stable version appears on the eDesk home page with the installed and available versions.
+- The user can select **Update** to verify, download, and install the update, or close the notice to postpone it until a later check.
+- **Settings > General > Other** contains **Automatically check for eDesk updates**.
+- **Settings > About** contains **Check for updates** and reports whether eDesk is current.
+- eDesk does not silently install an update. Installation is user-initiated.
+- Background checks do not install while a remote session is active.
 
-**eDesk Update Available**
+## Trusted release channel
 
-A new version of eDesk is available. Update now to get the latest features, improvements and security fixes.
+The only update source is:
 
-- Show the installed version and the available version.
-- **Update Now** starts the verified download and installation flow.
-- **Remind Me Later** closes the dialog and postpones the reminder.
-- Provide a release-notes link.
-- Do not show the same version notification repeatedly after the user postpones it; remind again on a later launch or after a reasonable interval.
-- Show clear progress, cancellation where safe, and an error message if verification or installation fails.
+`https://github.com/qtx1356-lang/edesk-client/releases/latest`
 
-## Check behavior
+Stable release tags use `edesk-vX.Y.Z`. Drafts and prereleases are excluded. The client constructs and validates the release URL itself rather than trusting a URL from the API response.
 
-1. Check for updates after startup, with a short delay so the application can finish opening.
-2. Check periodically (default: once every 24 hours) while the app is running.
-3. Add a manual **Check for updates** action in Settings > About.
-4. Offer an **Automatically check for updates** setting, enabled by default. Turning it off disables background checks but keeps manual checks available.
-5. Do not interrupt active remote-control, file-transfer, voice, or other sessions. Defer installation until all sessions have ended.
-6. Do not force-install an update. The user confirms installation through **Update Now**.
-7. Do not silently downgrade or install a release that is not newer than the installed version.
-8. Stable releases only by default; prereleases are excluded unless a future advanced setting is explicitly added.
+The update payload is the self-contained Windows portable package produced by `libs/portable`, named `edesk-X.Y.Z-install.exe`. This package contains the full application runtime and is launched through the existing verified Windows update handoff. The separate `eDesk-Setup.exe` remains the first-install/recovery installer.
 
-## Release and verification architecture
+## Signed metadata
 
-- Use the eDesk GitHub repository's own Releases as the authoritative update channel, not RustDesk's update service or RustDesk releases.
-- Publish a versioned Windows x64 installer/package and release notes for each eDesk release.
-- Publish signed update metadata that identifies the eDesk package, semantic version, release ID, platform, architecture, package format, HTTPS download URL, file size, and SHA-256 digest.
-- Sign metadata with a dedicated eDesk Ed25519 release key. Keep the private signing key only in GitHub Actions secrets; never commit it, put it in the app, or ask users to paste it into chat.
-- Embed only the matching public verification key in the client. Verify the metadata signature, expected eDesk package identity, version, release URL, file size, and SHA-256 before allowing installation.
-- Keep RustDesk's existing verified-update and safe-installation mechanisms where compatible, but do not point eDesk at RustDesk's release feed or trust RustDesk's signing key as an eDesk release key.
-- Fail closed: if metadata, signature, package identity, or digest verification fails, do not install the update.
-- Never use an unsigned mutable download URL as the trust mechanism.
+Every stable release must include:
 
-## Compatibility and implementation notes
+- `edesk-update.json`
+- `edesk-update.json.sig`
+- `edesk-X.Y.Z-install.exe`
+- `eDesk-Setup.exe`
 
-The pinned RustDesk 1.5.3 baseline already contains an update-check thread, a Flutter update progress dialog, and verified update artifact handling. However, the upstream common update check explicitly skips custom clients and the upstream metadata currently identifies RustDesk. eDesk must therefore add its own release feed and eDesk trust identity before enabling automatic checks. Reuse compatible UI, download progress, and verified installer code instead of building a parallel updater.
+The metadata binds the eDesk app/package identity, version, release tag, Windows x64 platform, package filename, exact GitHub asset URL, file size, and SHA-256 digest. The detached Ed25519 signature covers the metadata with the context string `eDesk update metadata v1\n`.
 
-The first eDesk release workflow currently creates a short-lived CI artifact, not a signed public release. A separate release workflow must be added after the eDesk signing public key is embedded and the matching private key is safely configured as a repository Actions secret.
+The public verification key is embedded in `src/update_metadata.rs`. The matching private seed is not stored in the repository. The GitHub Actions release step requires the repository Actions secret:
+
+`EDESK_UPDATE_SIGNING_KEY`
+
+Its value must be the base64 text from the private signing-key file supplied to the repository owner. Never commit that file, upload it as a workflow artifact, or paste its contents into source code or a public issue.
+
+## Release procedure
+
+1. Bump the application version in `Cargo.toml` and the matching root package entry in `Cargo.lock`.
+2. Push a tag that exactly matches the manifest version, for example `edesk-v1.5.5`.
+3. GitHub Actions builds the Windows app, portable update package, and Inno Setup installer.
+4. The release job signs the metadata using `EDESK_UPDATE_SIGNING_KEY` and publishes all release assets.
+5. The installed eDesk client discovers the stable release and displays the update notice.
+
+A manual workflow run creates short-lived CI artifacts for testing; it does not publish a public release.
+
+## Verification and safety rules
+
+- Verify the metadata signature before trusting any artifact fields.
+- Require the exact eDesk package identity, stable version, release tag, platform, architecture, and GitHub release asset URL.
+- Verify the downloaded file size and SHA-256 before launching the update handoff.
+- Reject malformed metadata, unknown signing keys, invalid signatures, wrong package IDs, mismatched URLs, unexpected filenames, and hash/size mismatches.
+- Never use the RustDesk update service, RustDesk release feed, or RustDesk signing identity for eDesk.
+- Never downgrade or install the same version again.
+- Network or verification failures leave the current installation untouched.
 
 ## Acceptance tests
 
-1. A newer eDesk stable release triggers one in-app notification with installed and available versions.
-2. Update Now downloads the correct Windows x64 eDesk package, verifies signed metadata and SHA-256, then launches the safe installer.
-3. Remind Me Later postpones the same notification.
-4. No update is offered when the installed version is current or newer.
-5. RustDesk releases and RustDesk update services are never treated as eDesk updates.
-6. Invalid signatures, changed artifacts, wrong package IDs, or mismatched hashes are rejected.
-7. Background checks can be disabled; manual checks still work.
-8. Installation is deferred while any remote session, file transfer, or voice session is active.
-9. Network failure does not corrupt the installed application or block normal eDesk use.
+1. A newer stable eDesk release produces one in-app update notice.
+2. The About page manual check works even when automatic checks are disabled.
+3. Update Now downloads the signed Windows x64 package, verifies its metadata, size, and SHA-256, and starts the eDesk update handoff.
+4. The update preserves the eDesk ID and user settings.
+5. Closing the notice postpones it; a later launch/check can show it again.
+6. No update is offered when the installed version is current or newer.
+7. RustDesk releases and services are never considered eDesk updates.
+8. Invalid signatures, changed files, wrong package IDs, and mismatched hashes are rejected.
+9. Updates are not started during active remote sessions.
+10. A failed check or download does not damage the installed application.
+
+**Not yet production-verified:** CI build of the portable update package, GitHub release publication using the configured secret, and end-to-end update from an already installed eDesk version on Windows.
