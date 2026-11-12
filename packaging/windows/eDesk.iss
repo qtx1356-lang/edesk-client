@@ -32,8 +32,6 @@ VersionInfoVersion={#MyAppVersion}.0
 VersionInfoProductName=eDesk
 VersionInfoCompany=eDesk
 
-[UninstallRun]
-Filename: "{app}\\{#MyAppExeName}"; Parameters: "--uninstall-service"; RunOnceId: "Remove eDesk background service"; Flags: runhidden waituntilterminated
 
 [UninstallRun]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-service"; RunOnceId: "Remove eDesk background service"; Flags: runhidden waituntilterminated
