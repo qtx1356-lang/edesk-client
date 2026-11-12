@@ -1157,6 +1157,18 @@ fn clear_software_update_url() {
     *update_url = String::new();
 }
 
+fn notify_software_update_check_finish(update_url: &str) {
+    #[cfg(feature = "flutter")]
+    {
+        let mut m = HashMap::new();
+        m.insert("name", "check_software_update_finish");
+        m.insert("url", update_url);
+        if let Ok(data) = serde_json::to_string(&m) {
+            let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
+        }
+    }
+}
+
 fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
     // GitHub's /releases/latest endpoint excludes drafts and prereleases. Still validate
     // the returned tag and construct the release URL ourselves rather than trusting a URL
@@ -1183,17 +1195,8 @@ fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
         String::new()
     };
     *SOFTWARE_UPDATE_URL.lock().unwrap() = update_url.clone();
-
     // Always report the result so the About page can show "up to date" after a manual check.
-    #[cfg(feature = "flutter")]
-    {
-        let mut m = HashMap::new();
-        m.insert("name", "check_software_update_finish");
-        m.insert("url", &update_url);
-        if let Ok(data) = serde_json::to_string(&m) {
-            let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
-        }
-    }
+    notify_software_update_check_finish(&update_url);
     Ok(())
 }
 
@@ -1238,7 +1241,12 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
         Ok((used_tls_type, response)) => {
             upsert_tls_cache(tls_url, used_tls_type, false);
             let status = response.status();
-            if !status.is_success() {
+            if status == reqwest::StatusCode::NOT_FOUND {
+                // No stable eDesk release has been published yet.
+                clear_software_update_url();
+                notify_software_update_check_finish("");
+                Ok(Bytes::new())
+            } else if !status.is_success() {
                 Err(anyhow!(
                     "Software update check failed with HTTP status: {status}"
                 ))
@@ -1248,7 +1256,13 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
         }
         Err(err) => Err(err),
     };
-    let result = response_bytes.and_then(process_software_update_check_response);
+    let result = response_bytes.and_then(|bytes| {
+        if bytes.is_empty() {
+            Ok(())
+        } else {
+            process_software_update_check_response(bytes)
+        }
+    });
     if result.is_err() {
         clear_software_update_url();
     }
