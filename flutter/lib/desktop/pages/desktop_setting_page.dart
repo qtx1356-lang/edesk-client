@@ -2489,6 +2489,33 @@ class _AboutState extends State<_About> {
               SelectionArea(
                   child: Text('${translate('ID')}: $myId')
                       .marginSymmetric(vertical: 4.0)),
+              if (isWindows) ...[
+                Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        stateGlobal.updateCheckCompleted.value = false;
+                        await bind.mainSetCommon(
+                            key: 'check-for-updates', value: '');
+                        showToast('Checking for eDesk updates...');
+                      },
+                      icon: const Icon(Icons.system_update_alt),
+                      label: Text(translate('Check for updates')),
+                    ),
+                  ],
+                ).marginSymmetric(vertical: 8.0),
+                Obx(() {
+                  if (!stateGlobal.updateCheckCompleted.value) {
+                    return const SizedBox.shrink();
+                  }
+                  final updateUrl = stateGlobal.updateUrl.value;
+                  return Text(
+                    updateUrl.isEmpty
+                        ? 'eDesk is up to date.'
+                        : 'A new eDesk version is available: ${bind.mainGetNewVersion()}',
+                  ).marginSymmetric(vertical: 4.0);
+                }),
+              ],
               InkWell(
                   onTap: () {
                     launchUrlString('https://rustdesk.com/privacy.html');
