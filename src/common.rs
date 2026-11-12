@@ -1058,8 +1058,13 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
 }
 
 pub fn check_software_update() {
-    if is_custom_client() {
+    if is_custom_client() && !is_edesk_client() {
         return;
+    }
+    if is_edesk_client() {
+        // Reuse the daily scheduler, but eDesk only notifies the user.
+        // It never silently installs an update from this background path.
+        crate::updater::start_auto_update();
     }
     let opt = LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
     if config::option2bool(keys::OPTION_ENABLE_CHECK_UPDATE, &opt) {
@@ -1097,10 +1102,10 @@ pub(crate) fn release_id_from_update_url(update_url: &str) -> ResultType<String>
     };
     let segments = segments.collect::<Vec<_>>();
     let release_id = match segments.as_slice() {
-        ["rustdesk", "rustdesk", "releases", "tag", release_id] => *release_id,
-        ["rustdesk", "rustdesk", "releases", "tag", release_id, ""] => *release_id,
+        ["qtx1356-lang", "edesk-client", "releases", "tag", release_id] => *release_id,
+        ["qtx1356-lang", "edesk-client", "releases", "tag", release_id, ""] => *release_id,
         _ => bail!(
-            "Update URL is not a RustDesk release tag URL: {}",
+            "Update URL is not an eDesk release tag URL: {}",
             update_url
         ),
     };
@@ -1128,7 +1133,9 @@ pub(crate) fn url_has_explicit_port(raw_url: &str) -> bool {
 }
 
 pub(crate) fn display_version_from_release_id(release_id: &str) -> ResultType<String> {
-    let display_version = release_id.strip_prefix('v').unwrap_or(release_id);
+    let display_version = release_id
+        .strip_prefix("edesk-v")
+        .ok_or_else(|| anyhow!("Release id is not an eDesk stable tag: {}", release_id))?;
     let segments = display_version.split('.').collect::<Vec<_>>();
     if segments.len() != 3
         || segments.iter().any(|segment| {
@@ -1151,8 +1158,23 @@ fn clear_software_update_url() {
 }
 
 fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
-    let resp: hbb_common::VersionCheckResponse = serde_json::from_slice(&bytes)?;
-    let response_url = resp.url;
+    // GitHub's /releases/latest endpoint excludes drafts and prereleases. Still validate
+    // the returned tag and construct the release URL ourselves rather than trusting a URL
+    // supplied by the response body.
+    let resp: Value = serde_json::from_slice(&bytes)?;
+    if resp.get("draft").and_then(Value::as_bool).unwrap_or(true)
+        || resp.get("prerelease").and_then(Value::as_bool).unwrap_or(true)
+    {
+        clear_software_update_url();
+        return Ok(());
+    }
+    let release_id = resp
+        .get("tag_name")
+        .and_then(Value::as_str)
+        .ok_or_else(|| anyhow!("eDesk release response is missing tag_name"))?;
+    let response_url = format!(
+        "https://github.com/qtx1356-lang/edesk-client/releases/tag/{release_id}"
+    );
     let release_id = release_id_from_update_url(&response_url)?;
     let latest_release_version = display_version_from_release_id(&release_id)?;
 
@@ -1173,26 +1195,35 @@ fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
     Ok(())
 }
 
-// No need to check `danger_accept_invalid_cert` for now.
-// Because the url is always `https://api.rustdesk.com/version/latest`.
+// The eDesk updater deliberately uses only this repository's stable GitHub release feed.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
-    let (request, url) =
-        hbb_common::version_check_request(hbb_common::VER_TYPE_RUSTDESK_CLIENT.to_string());
+    let url = "https://api.github.com/repos/qtx1356-lang/edesk-client/releases/latest";
     let proxy_conf = Config::get_socks();
     let tls_url = get_url_for_tls(&url, &proxy_conf);
     let tls_type = get_cached_tls_type(tls_url);
     let is_tls_not_cached = tls_type.is_none();
     let tls_type = tls_type.unwrap_or(TlsType::Rustls);
     let client = create_http_client_async(tls_type, false);
-    let latest_release_response: ResultType<_> = match client.post(&url).json(&request).send().await
+    let latest_release_response: ResultType<_> = match client
+        .get(url)
+        .header("User-Agent", "eDesk-Updater")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
     {
         Ok(resp) => Ok((tls_type, resp)),
         Err(err) => {
             if is_tls_not_cached && err.is_request() {
                 let tls_type = TlsType::NativeTls;
                 let client = create_http_client_async(tls_type, false);
-                match client.post(&url).json(&request).send().await {
+                match client
+                    .get(url)
+                    .header("User-Agent", "eDesk-Updater")
+                    .header("Accept", "application/vnd.github+json")
+                    .send()
+                    .await
+                {
                     Ok(resp) => Ok((tls_type, resp)),
                     Err(err) => Err(err.into()),
                 }
@@ -2710,6 +2741,11 @@ pub fn is_custom_client() -> bool {
     get_app_name() != "RustDesk"
 }
 
+#[inline]
+pub fn is_edesk_client() -> bool {
+    get_app_name().eq_ignore_ascii_case("eDesk")
+}
+
 pub fn verify_login(_raw: &str, _id: &str) -> bool {
     true
     /*
@@ -3119,11 +3155,12 @@ mod tests {
     }
 
     #[test]
-    fn parses_stable_rustdesk_release_url() {
-        let update_url = "https://github.com/rustdesk/rustdesk/releases/tag/v1.4.6";
+    fn parses_stable_edesk_release_url() {
+        let update_url =
+            "https://github.com/qtx1356-lang/edesk-client/releases/tag/edesk-v1.5.4";
 
-        assert_eq!(release_id_from_update_url(update_url).unwrap(), "v1.4.6");
-        assert_eq!(display_version_from_release_id("v1.4.6").unwrap(), "1.4.6");
+        assert_eq!(release_id_from_update_url(update_url).unwrap(), "edesk-v1.5.4");
+        assert_eq!(display_version_from_release_id("edesk-v1.5.4").unwrap(), "1.5.4");
         assert_eq!(
             release_id_from_update_url(&format!("{update_url}/")).unwrap(),
             "v1.4.6"
@@ -3133,23 +3170,23 @@ mod tests {
     #[test]
     fn rejects_untrusted_release_urls_and_unstable_versions() {
         for update_url in [
-            "http://github.com/rustdesk/rustdesk/releases/tag/v1.4.6",
-            "https://github.com:8443/rustdesk/rustdesk/releases/tag/v1.4.6",
-            "https://github.com:443/rustdesk/rustdesk/releases/tag/v1.4.6",
-            "https://user@github.com/rustdesk/rustdesk/releases/tag/v1.4.6",
-            "https://example.com/rustdesk/rustdesk/releases/tag/v1.4.6",
-            "https://github.com/other/rustdesk/releases/tag/v1.4.6",
-            "https://github.com/rustdesk/other/releases/tag/v1.4.6",
-            "https://github.com/rustdesk/rustdesk/releases/download/v1.4.6/rustdesk.exe",
-            "https://github.com/rustdesk/rustdesk/releases/tag/v1.4.6?x=1",
-            "https://github.com/rustdesk/rustdesk/releases/tag/v1.4.6#asset",
-            "https://github.com/rustdesk/rustdesk/releases/tag/v1.4.6/extra",
-            "https://github.com/rustdesk/rustdesk/releases/tag/v1%2F4%2F6",
-            "https://github.com/rustdesk/rustdesk/releases/tag/%2e%2e",
+            "http://github.com/qtx1356-lang/edesk-client/releases/tag/edesk-v1.5.4",
+            "https://github.com:8443/qtx1356-lang/edesk-client/releases/tag/edesk-v1.5.4",
+            "https://github.com:443/qtx1356-lang/edesk-client/releases/tag/edesk-v1.5.4",
+            "https://user@github.com/qtx1356-lang/edesk-client/releases/tag/edesk-v1.5.4",
+            "https://example.com/qtx1356-lang/edesk-client/releases/tag/edesk-v1.5.4",
+            "https://github.com/other/edesk-client/releases/tag/edesk-v1.5.4",
+            "https://github.com/qtx1356-lang/other/releases/tag/edesk-v1.5.4",
+            "https://github.com/qtx1356-lang/edesk-client/releases/download/edesk-v1.5.4/edesk.exe",
+            "https://github.com/qtx1356-lang/edesk-client/releases/tag/edesk-v1.5.4?x=1",
+            "https://github.com/qtx1356-lang/edesk-client/releases/tag/edesk-v1.5.4#asset",
+            "https://github.com/qtx1356-lang/edesk-client/releases/tag/edesk-v1.5.4/extra",
+            "https://github.com/qtx1356-lang/edesk-client/releases/tag/edesk-v1%2F5%2F4",
+            "https://github.com/qtx1356-lang/edesk-client/releases/tag/%2e%2e",
         ] {
             assert!(release_id_from_update_url(update_url).is_err());
         }
-        for release_id in ["v1.4.6-rc1", "nightly", "v9223372036854775807.1.1"] {
+        for release_id in ["edesk-v1.5.4-rc1", "nightly", "edesk-v9223372036854775807.1.1"] {
             assert!(display_version_from_release_id(release_id).is_err());
         }
     }
