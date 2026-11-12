@@ -29,7 +29,21 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Cache generated bridge sources
+        id: cache-generated-bridge
+        uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3
+        with:
+          path: |
+            ./src/bridge_generated.rs
+            ./src/bridge_generated.io.rs
+            ./flutter/lib/generated_bridge.dart
+            ./flutter/lib/generated_bridge.freezed.dart
+            ./flutter/macos/Runner/bridge_generated.h
+            ./flutter/ios/Runner/bridge_generated.h
+          key: generated-bridge-${{ matrix.job.flutter-version }}-${{ hashFiles('src/flutter_ffi.rs', 'flutter/pubspec.yaml', 'flutter/pubspec.lock') }}-v1
+
       - name: Install prerequisites
+        if: steps.cache-generated-bridge.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install ca-certificates -y
           sudo apt-get update -y
@@ -49,6 +63,7 @@ jobs:
             wget
 
       - name: Install Rust toolchain
+        if: steps.cache-generated-bridge.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
@@ -56,30 +71,21 @@ jobs:
           components: "rustfmt"
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        if: steps.cache-generated-bridge.outputs.cache-hit != 'true'
         with:
           prefix-key: bridge-${{ matrix.job.os }}
 
       - name: Cache Bridge
+        if: steps.cache-generated-bridge.outputs.cache-hit != 'true'
         id: cache-bridge
         uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3
         with:
           path: /tmp/flutter_rust_bridge
           key: bridge-${{ matrix.job.flutter-version }}
 
-      - name: Cache generated bridge sources
-        id: cache-generated-bridge
-        uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3
-        with:
-          path: |
-            ./src/bridge_generated.rs
-            ./src/bridge_generated.io.rs
-            ./flutter/lib/generated_bridge.dart
-            ./flutter/lib/generated_bridge.freezed.dart
-            ./flutter/macos/Runner/bridge_generated.h
-            ./flutter/ios/Runner/bridge_generated.h
-          key: generated-bridge-${{ matrix.job.flutter-version }}-${{ hashFiles('src/flutter_ffi.rs', 'flutter/pubspec.yaml', 'flutter/pubspec.lock') }}-v1
 
       - name: Install flutter
+        if: steps.cache-generated-bridge.outputs.cache-hit != 'true'
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: "stable"
@@ -87,6 +93,7 @@ jobs:
           cache: true
 
       - name: Install flutter rust bridge deps
+        if: steps.cache-generated-bridge.outputs.cache-hit != 'true'
         shell: bash
         run: |
           cargo install cargo-expand --version ${{ env.CARGO_EXPAND_VERSION }} --locked
