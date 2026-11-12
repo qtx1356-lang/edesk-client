@@ -11,7 +11,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher=eDesk
-DefaultDirName={localappdata}\Programs\eDesk
+DefaultDirName={autopf}\eDesk
 DefaultGroupName=eDesk
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
@@ -35,6 +35,9 @@ VersionInfoCompany=eDesk
 [UninstallRun]
 Filename: "{app}\\{#MyAppExeName}"; Parameters: "--uninstall-service"; RunOnceId: "Remove eDesk background service"; Flags: runhidden waituntilterminated
 
+[UninstallRun]
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-service"; RunOnceId: "Remove eDesk background service"; Flags: runhidden waituntilterminated
+
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
@@ -49,4 +52,5 @@ Name: "{group}\eDesk"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\eDesk"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-service"; StatusMsg: "Installing eDesk background service..."; Flags: runhidden waituntilterminated
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch eDesk"; Flags: postinstall nowait skipifsilent
