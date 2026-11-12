@@ -4127,6 +4127,8 @@ void checkUpdate() {
           (Map<String, dynamic> evt) async {
         if (evt['url'] is String) {
           stateGlobal.updateUrl.value = evt['url'];
+          stateGlobal.updateCheckError.value =
+              evt['error'] is String ? evt['error'] : '';
           stateGlobal.updateCheckCompleted.value = true;
         }
       });
