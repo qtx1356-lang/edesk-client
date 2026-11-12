@@ -1177,20 +1177,22 @@ fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
     );
     let release_id = release_id_from_update_url(&response_url)?;
     let latest_release_version = display_version_from_release_id(&release_id)?;
-
-    if get_version_number(&latest_release_version) > get_version_number(crate::VERSION) {
-        #[cfg(feature = "flutter")]
-        {
-            let mut m = HashMap::new();
-            m.insert("name", "check_software_update_finish");
-            m.insert("url", &response_url);
-            if let Ok(data) = serde_json::to_string(&m) {
-                let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
-            }
-        }
-        *SOFTWARE_UPDATE_URL.lock().unwrap() = response_url;
+    let update_url = if get_version_number(&latest_release_version) > get_version_number(crate::VERSION) {
+        response_url
     } else {
-        clear_software_update_url();
+        String::new()
+    };
+    *SOFTWARE_UPDATE_URL.lock().unwrap() = update_url.clone();
+
+    // Always report the result so the About page can show "up to date" after a manual check.
+    #[cfg(feature = "flutter")]
+    {
+        let mut m = HashMap::new();
+        m.insert("name", "check_software_update_finish");
+        m.insert("url", &update_url);
+        if let Ok(data) = serde_json::to_string(&m) {
+            let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
+        }
     }
     Ok(())
 }
