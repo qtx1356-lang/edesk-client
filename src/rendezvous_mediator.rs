@@ -332,7 +332,9 @@ impl RendezvousMediator {
         let start_lan_listening = true;
         if start_lan_listening {
             std::thread::spawn(move || {
-                allow_err!(super::lan::start_listening());
+                if let Err(err) = super::lan::start_listening() {
+                    log::error!("eDesk LAN discovery listener failed to start: {:#}", err);
+                }
             });
         }
         scrap::codec::test_av1();
