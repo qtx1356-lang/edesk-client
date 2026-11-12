@@ -1241,7 +1241,7 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
         Ok((used_tls_type, response)) => {
             upsert_tls_cache(tls_url, used_tls_type, false);
             let status = response.status();
-            if status == reqwest::StatusCode::NOT_FOUND {
+            if status.as_u16() == 404 {
                 // No stable eDesk release has been published yet.
                 clear_software_update_url();
                 notify_software_update_check_finish("");
