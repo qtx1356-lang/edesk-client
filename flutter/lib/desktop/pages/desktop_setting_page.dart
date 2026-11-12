@@ -2495,6 +2495,7 @@ class _AboutState extends State<_About> {
                     ElevatedButton.icon(
                       onPressed: () async {
                         stateGlobal.updateCheckCompleted.value = false;
+                        stateGlobal.updateCheckError.value = '';
                         await bind.mainSetCommon(
                             key: 'check-for-updates', value: '');
                         showToast('Checking for eDesk updates...');
@@ -2509,10 +2510,13 @@ class _AboutState extends State<_About> {
                     return const SizedBox.shrink();
                   }
                   final updateUrl = stateGlobal.updateUrl.value;
+                  final updateError = stateGlobal.updateCheckError.value;
                   return Text(
-                    updateUrl.isEmpty
-                        ? 'eDesk is up to date.'
-                        : 'A new eDesk version is available: ${bind.mainGetNewVersion()}',
+                    updateError.isNotEmpty
+                        ? 'Could not check for eDesk updates: $updateError'
+                        : updateUrl.isEmpty
+                            ? 'eDesk is up to date.'
+                            : 'A new eDesk version is available: ${bind.mainGetNewVersion()}',
                   ).marginSymmetric(vertical: 4.0);
                 }),
               ],
