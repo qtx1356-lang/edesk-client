@@ -1,0 +1,50 @@
+#ifndef MyAppVersion
+  #define MyAppVersion "1.5.3"
+#endif
+
+#define MyAppName "eDesk"
+#define MyAppExeName "edesk.exe"
+
+[Setup]
+AppId={{A6C42B19-3F3B-4C84-9D9D-ED35D4A7B2C1}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppVerName={#MyAppName} {#MyAppVersion}
+AppPublisher=eDesk
+DefaultDirName={localappdata}\Programs\eDesk
+DefaultGroupName=eDesk
+DisableProgramGroupPage=yes
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
+MinVersion=10.0
+OutputDir=..\..\dist
+OutputBaseFilename=eDesk-Setup
+SetupIconFile=..\..\flutter\windows\runner\resources\app_icon.ico
+UninstallDisplayIcon={app}\edesk.exe
+Compression=lzma2
+SolidCompression=yes
+WizardStyle=modern
+CloseApplications=yes
+RestartApplications=no
+Uninstallable=yes
+VersionInfoVersion={#MyAppVersion}
+VersionInfoProductName=eDesk
+VersionInfoCompany=eDesk
+
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+
+[Files]
+Source: "..\..\edesk-baseline\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{group}\eDesk"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\eDesk"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch eDesk"; Flags: postinstall nowait skipifsilent
