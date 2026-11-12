@@ -2872,6 +2872,14 @@ fn verified_update_artifact_for_release_page_url(
 }
 
 pub fn main_set_common(_key: String, _value: String) {
+    if _key == "check-for-updates" && crate::common::is_edesk_client() {
+        std::thread::spawn(|| {
+            if let Err(error) = crate::common::do_check_software_update() {
+                log::warn!("Manual eDesk update check failed: {}", error);
+            }
+        });
+        return;
+    }
     #[cfg(target_os = "windows")]
     if _key == "install-printer" && crate::platform::is_win_10_or_greater() {
         std::thread::spawn(move || {
