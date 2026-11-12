@@ -66,6 +66,19 @@ jobs:
           path: /tmp/flutter_rust_bridge
           key: bridge-${{ matrix.job.flutter-version }}
 
+      - name: Cache generated bridge sources
+        id: cache-generated-bridge
+        uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3
+        with:
+          path: |
+            ./src/bridge_generated.rs
+            ./src/bridge_generated.io.rs
+            ./flutter/lib/generated_bridge.dart
+            ./flutter/lib/generated_bridge.freezed.dart
+            ./flutter/macos/Runner/bridge_generated.h
+            ./flutter/ios/Runner/bridge_generated.h
+          key: generated-bridge-${{ matrix.job.flutter-version }}-${{ hashFiles('src/flutter_ffi.rs', 'flutter/pubspec.yaml', 'flutter/pubspec.lock') }}-v1
+
       - name: Install flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
@@ -89,6 +102,7 @@ jobs:
           pushd flutter && flutter pub get && popd
 
       - name: Run flutter rust bridge
+        if: steps.cache-generated-bridge.outputs.cache-hit != 'true'
         run: |
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
           cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
