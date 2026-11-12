@@ -2955,6 +2955,13 @@ pub fn main_set_common(_key: String, _value: String) {
                 serde_json::ser::to_string(&data).unwrap_or("".to_owned()),
             );
         } else if _key == "update-me" {
+            #[cfg(target_os = "windows")]
+            if crate::common::is_edesk_client() && !crate::updater::has_no_active_conns() {
+                push_update_me_error(
+                    "Close all active remote sessions before updating eDesk.".to_owned(),
+                );
+                return;
+            }
             let artifact = match crate::updater::verified_update_artifact_for_download_url(&_value)
             {
                 Ok(artifact) => artifact,
