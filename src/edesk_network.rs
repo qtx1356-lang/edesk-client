@@ -13,10 +13,15 @@ use std::net::Ipv4Addr;
 /// treated as a local Wi-Fi or wired LAN.
 #[cfg(not(target_os = "ios"))]
 pub(crate) fn is_allowed_lan_interface(interface: &default_net::interface::Interface) -> bool {
-    interface.is_up()
-        && !interface.is_loopback()
-        && !interface.is_point_to_point()
-        && !interface.is_tun()
+    // default-net 0.14.1 exposes interface types but not the newer convenience
+    // predicates (is_up/is_loopback/is_point_to_point/is_tun).
+    !interface.ipv4.is_empty()
+        && !matches!(
+            interface.if_type,
+            default_net::interface::InterfaceType::Loopback
+                | default_net::interface::InterfaceType::Ppp
+                | default_net::interface::InterfaceType::Tunnel
+        )
 }
 
 #[cfg(not(target_os = "ios"))]
