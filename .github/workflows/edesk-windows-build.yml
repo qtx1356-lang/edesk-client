@@ -141,7 +141,7 @@ jobs:
       - name: Build Windows Flutter application
         shell: powershell
         run: |
-          python3 .\build.py --portable --flutter
+          python3 .\build.py --portable --flutter --skip-portable-pack
           Move-Item ./flutter/build/windows/x64/runner/Release ./edesk-baseline
           if (-not (Test-Path ".\edesk-$env:VERSION-install.exe")) {
             throw "The signed-update payload edesk-$env:VERSION-install.exe was not created."
@@ -160,6 +160,17 @@ jobs:
           Get-ChildItem .\\edesk-baseline -Recurse -File |
             Where-Object { $extensions -contains $_.Extension.ToLowerInvariant() } |
             Remove-Item -Force
+
+      - name: Build complete eDesk self-update package
+        shell: powershell
+        run: |
+          python3 -m pip install --disable-pip-version-check -r .\libs\portable\requirements.txt
+          python3 .\libs\portable\generate.py -f .\edesk-baseline -o .\libs\portable -e .\edesk-baseline\edesk.exe
+          if ($LASTEXITCODE -ne 0) { throw "eDesk portable update package build failed." }
+          Copy-Item .\libs\portable\target\release\rustdesk-portable-packer.exe ".\edesk-$env:VERSION-install.exe" -Force
+          if (-not (Test-Path ".\edesk-$env:VERSION-install.exe")) {
+            throw "eDesk self-update package was not created."
+          }
 
       - name: Report package size
         shell: powershell
