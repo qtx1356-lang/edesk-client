@@ -18,6 +18,7 @@ typedef int (*FUNC_RUSTDESK_GET_APP_NAME)(wchar_t*, int);
 typedef int (*FUNC_RUSTDESK_IS_DISABLE_INSTALLATION)();
 /// Note: `--server`, `--service` are already handled in [core_main.rs].
 const std::vector<std::string> parameters_white_list = {"--install", "--cm"};
+const std::string multi_instance_param = "--multi-instance";
 
 const wchar_t* getWindowClassName();
 
@@ -94,11 +95,24 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
 
   // Uri links dispatch
+  // The explicit --multi-instance switch is intended for local testing. It
+  // bypasses the normal single-window forwarding behavior so a second eDesk
+  // process can create its own Flutter window.
+  const bool force_multi_instance =
+      std::find(command_line_arguments.begin(),
+                command_line_arguments.end(),
+                multi_instance_param) != command_line_arguments.end();
+  command_line_arguments.erase(
+      std::remove(command_line_arguments.begin(),
+                  command_line_arguments.end(),
+                  multi_instance_param),
+      command_line_arguments.end());
+
   HWND hwnd = ::FindWindowW(getWindowClassName(), app_name.c_str());
   if (hwnd != NULL) {
     // Allow multiple flutter instances when being executed by parameters
     // contained in whitelists.
-    bool allow_multiple_instances = false;
+    bool allow_multiple_instances = force_multi_instance;
     for (auto& whitelist_param : parameters_white_list) {
       allow_multiple_instances =
           allow_multiple_instances ||
