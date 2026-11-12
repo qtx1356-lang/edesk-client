@@ -164,7 +164,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check -r .\libs\portable\requirements.txt
           python3 .\libs\portable\generate.py -f .\edesk-baseline -o .\libs\portable -e .\edesk-baseline\edesk.exe
           if ($LASTEXITCODE -ne 0) { throw "eDesk portable update package build failed." }
-          Copy-Item .\libs\portable\target\release\rustdesk-portable-packer.exe ".\edesk-$env:VERSION-install.exe" -Force
+          Copy-Item .\target\release\rustdesk-portable-packer.exe ".\edesk-$env:VERSION-install.exe" -Force
           if (-not (Test-Path ".\edesk-$env:VERSION-install.exe")) {
             throw "eDesk self-update package was not created."
           }
