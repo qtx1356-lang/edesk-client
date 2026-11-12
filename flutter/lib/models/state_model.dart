@@ -27,6 +27,7 @@ class StateGlobal {
 
   final updateUrl = ''.obs;
   final updateCheckCompleted = false.obs;
+  final updateCheckError = ''.obs;
 
   String _inputSource = '';
 
