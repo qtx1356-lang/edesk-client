@@ -14,8 +14,7 @@ AppPublisher=eDesk
 DefaultDirName={localappdata}\Programs\eDesk
 DefaultGroupName=eDesk
 DisableProgramGroupPage=yes
-PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
+PrivilegesRequired=admin
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 MinVersion=10.0
@@ -32,6 +31,9 @@ Uninstallable=yes
 VersionInfoVersion={#MyAppVersion}.0
 VersionInfoProductName=eDesk
 VersionInfoCompany=eDesk
+
+[UninstallRun]
+Filename: "{app}\\{#MyAppExeName}"; Parameters: "--uninstall-service"; RunOnceId: "Remove eDesk background service"; Flags: runhidden waituntilterminated
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
