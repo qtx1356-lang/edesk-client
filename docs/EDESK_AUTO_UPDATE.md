@@ -1,6 +1,6 @@
 # eDesk Automatic Update
 
-**Implementation status:** The Windows x64 update check, in-app notice, verified download flow, and signed-release publishing workflow are connected. The signing secret must be added to the GitHub repository, and the complete flow still needs a successful CI build and a real Windows update test before it is considered production-verified.
+**Implementation status:** The Windows x64 update check, in-app notice, signed metadata verifier, verified download flow, and signed-release publishing workflow are connected. The matching Ed25519 key pair is now provisioned, and the release script rejects a signing secret that does not match the public key embedded in the client. The secret must still be configured in GitHub, and the complete flow needs a release build plus a real Windows update test before it is production-verified.
 
 ## User experience
 
@@ -37,7 +37,7 @@ The public verification key is embedded in `src/update_metadata.rs`. The matchin
 
 `EDESK_UPDATE_SIGNING_KEY`
 
-Its value must be the base64 text from the private signing-key file supplied to the repository owner. Never commit that file, upload it as a workflow artifact, or paste its contents into source code or a public issue.
+Its value must be the single base64 line in `EDESK_UPDATE_SIGNING_KEY.txt` supplied separately to the repository owner. In GitHub, open **Settings → Secrets and variables → Actions → New repository secret**, use the exact name above, and paste the file's one-line value. The release workflow derives the public key from this secret and compares it with the embedded trusted public key before signing; a mismatch fails the release. Never commit this file, upload it as a workflow artifact, or paste its contents into source code or a public issue.
 
 ## Release procedure
 
