@@ -4127,6 +4127,7 @@ void checkUpdate() {
           (Map<String, dynamic> evt) async {
         if (evt['url'] is String) {
           stateGlobal.updateUrl.value = evt['url'];
+          stateGlobal.updateCheckCompleted.value = true;
         }
       });
       Timer(const Duration(seconds: 1), () async {
