@@ -212,11 +212,43 @@ fn send_query() -> ResultType<(Vec<UdpSocket>, String)> {
     };
     msg_out.set_peer_discovery(peer);
     let out = msg_out.write_to_bytes()?;
-    let maddr = SocketAddr::from(([255, 255, 255, 255], get_broadcast_port()));
-    for socket in &sockets {
-        allow_err!(socket.send_to(&out, maddr));
+
+    // Send to each eligible adapter's subnet-directed broadcast address.
+    // Some Windows networks/router configurations do not reliably forward the
+    // limited broadcast address (255.255.255.255), even though local UDP works.
+    let mut broadcast_addrs = HashSet::new();
+    #[cfg(not(target_os = "ios"))]
+    for interface in default_net::get_interfaces() {
+        if !crate::edesk_network::is_allowed_lan_interface(&interface) {
+            continue;
+        }
+        for ipv4 in &interface.ipv4 {
+            let mask = u32::from(ipv4.netmask);
+            if mask == 0 || mask == u32::MAX {
+                continue;
+            }
+            let broadcast = Ipv4Addr::from(u32::from(ipv4.addr) | !mask);
+            if broadcast != ipv4.addr {
+                broadcast_addrs.insert(broadcast);
+            }
+        }
     }
-    log::info!("discover ping sent");
+
+    // Keep limited broadcast as a fallback for adapters where directed
+    // broadcast calculation is unavailable or not supported by the network.
+    broadcast_addrs.insert(Ipv4Addr::BROADCAST);
+    for socket in &sockets {
+        for broadcast in &broadcast_addrs {
+            let target = SocketAddr::from((*broadcast, get_broadcast_port()));
+            if let Err(err) = socket.send_to(&out, target) {
+                log::debug!("LAN discovery broadcast to {} failed: {}", target, err);
+            }
+        }
+    }
+    log::info!(
+        "LAN discovery ping sent to {} broadcast address(es)",
+        broadcast_addrs.len()
+    );
     Ok((sockets, nonce))
 }
 
