@@ -71,7 +71,7 @@ The current eDesk branch now has an initial connection-layer gate:
 - Relay requests, non-local intranet requests, and relay-connection creation fail closed. Local `FetchLocalAddr` signalling is allowed only when the listener binds to an eligible private LAN interface; it has no relay fallback. WebRTC/ICE, IPv6 punch, TURN and relay transports are disabled.
 - The rendezvous service is used for peer identity and connection signaling only; it must not carry session traffic. A relay fallback is never attempted.
 - The LAN discovery responder is started in portable desktop mode as well as installed-service mode. Discovery requests carry a fresh UUID nonce that must be echoed in the response, and responses are served only to sources on an eligible private subnet.
-- LAN discovery and subnet validation ignore adapters reported as down, loopback, point-to-point, or tunnel interfaces, reducing accidental use of VPN/tunnel adapters.
+- LAN discovery and subnet validation require an IPv4 address and exclude interface types reported as loopback, PPP, or tunnel. The pinned `default-net 0.14.1` API does not expose operational-up or generic point-to-point predicates, so adapter link state and VPN implementations that masquerade as ordinary Ethernet/Wi-Fi still require additional validation.
 
 **Connectivity dependency:** this implementation still needs the configured rendezvous service for signaling and signed peer identity. It is LAN-only for session transport, but it is not yet an offline-only product. A future local trust/identity mechanism would be needed to remove that dependency without weakening encryption.
 
