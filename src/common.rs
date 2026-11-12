@@ -1169,6 +1169,20 @@ fn notify_software_update_check_finish(update_url: &str) {
     }
 }
 
+fn notify_software_update_check_error(error: &str) {
+    #[cfg(feature = "flutter")]
+    {
+        let m = HashMap::from([
+            ("name", "check_software_update_finish"),
+            ("url", ""),
+            ("error", error),
+        ]);
+        if let Ok(data) = serde_json::to_string(&m) {
+            let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
+        }
+    }
+}
+
 fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
     // GitHub's /releases/latest endpoint excludes drafts and prereleases. Still validate
     // the returned tag and construct the release URL ourselves rather than trusting a URL
@@ -1263,8 +1277,9 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
             process_software_update_check_response(bytes)
         }
     });
-    if result.is_err() {
+    if let Err(error) = &result {
         clear_software_update_url();
+        notify_software_update_check_error(&error.to_string());
     }
     result
 }
