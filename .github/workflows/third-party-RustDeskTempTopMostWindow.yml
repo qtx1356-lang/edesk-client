@@ -38,14 +38,24 @@ jobs:
     env:
       build_output_dir: RustDeskTempTopMostWindow/WindowInjection/${{ inputs.platform }}/${{ inputs.configuration }}
     steps:
+      - name: Cache prebuilt helper DLL
+        id: cache-helper
+        uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3
+        with:
+          path: ./RustDeskTempTopMostWindow/WindowInjection/${{ inputs.platform }}/${{ inputs.configuration }}/WindowInjection.dll
+          key: topmost-helper-${{ runner.os }}-${{ inputs.platform }}-${{ inputs.configuration }}-ecd8d6a139eee76845ea66423fb739af450fda90-v1
+
       - name: Add MSBuild to PATH
+        if: steps.cache-helper.outputs.cache-hit != 'true'
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
       - name: Download the source code
+        if: steps.cache-helper.outputs.cache-hit != 'true'
         run: |
           git clone https://github.com/rustdesk-org/RustDeskTempTopMostWindow RustDeskTempTopMostWindow
 
       - name: Build the project
+        if: steps.cache-helper.outputs.cache-hit != 'true'
         run: |
           cd RustDeskTempTopMostWindow && git checkout ecd8d6a139eee76845ea66423fb739af450fda90
           msbuild ${{ env.project_path }} -p:Configuration=${{ inputs.configuration }} -p:Platform=${{ inputs.platform }} /p:TargetVersion=${{ inputs.target_version }}
