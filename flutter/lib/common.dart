@@ -4120,7 +4120,8 @@ void earlyAssert() {
 
 void checkUpdate() {
   if (!isWeb) {
-    if (!bind.isCustomClient()) {
+    final isEdesk = bind.mainGetAppNameSync().toLowerCase() == 'edesk';
+    if (!bind.isCustomClient() || isEdesk) {
       platformFFI.registerEventHandler(
           kCheckSoftwareUpdateFinish, kCheckSoftwareUpdateFinish,
           (Map<String, dynamic> evt) async {
