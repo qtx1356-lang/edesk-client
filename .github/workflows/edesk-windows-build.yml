@@ -215,18 +215,43 @@ jobs:
           retention-days: 7
           compression-level: 9
 
+      - name: Generate signed eDesk update metadata
+        shell: powershell
+        env:
+          EDESK_UPDATE_SIGNING_KEY: ${{ secrets.EDESK_UPDATE_SIGNING_KEY }}
+        run: |
+          if (-not $env:EDESK_UPDATE_SIGNING_KEY) {
+            if ($env:GITHUB_REF_TYPE -eq "tag") {
+              throw "Add the EDESK_UPDATE_SIGNING_KEY repository secret before publishing a release."
+            }
+            Write-Host "Signing secret is not configured; skipping signed metadata on this manual build."
+            exit 0
+          }
+          python3 -m pip install --disable-pip-version-check cryptography
+          python3 .\scripts\create_edesk_update_metadata.py --version $env:VERSION --tag "edesk-v$env:VERSION" --package ".\edesk-$env:VERSION-install.exe" --output-dir .\dist
+          if ($LASTEXITCODE -ne 0) { throw "eDesk update metadata signing failed." }
+
+      - name: Upload signed eDesk update metadata
+        if: ${{ hashFiles('dist/edesk-update.json') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: edesk-signed-update-metadata-x64
+          path: |
+            .\dist\edesk-update.json
+            .\dist\edesk-update.json.sig
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 9
+
       - name: Publish signed eDesk stable release
         if: startsWith(github.ref, 'refs/tags/edesk-v')
         shell: powershell
         env:
-          EDESK_UPDATE_SIGNING_KEY: ${{ secrets.EDESK_UPDATE_SIGNING_KEY }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          if (-not $env:EDESK_UPDATE_SIGNING_KEY) {
-            throw "Add the EDESK_UPDATE_SIGNING_KEY repository secret before publishing a release."
+          if (-not (Test-Path ".\dist\edesk-update.json") -or -not (Test-Path ".\dist\edesk-update.json.sig")) {
+            throw "Signed eDesk update metadata is missing."
           }
-          python3 -m pip install --disable-pip-version-check cryptography
-          python3 .\scripts\create_edesk_update_metadata.py --version $env:VERSION --tag $env:GITHUB_REF_NAME --package ".\edesk-$env:VERSION-install.exe" --output-dir .\dist
           gh release create $env:GITHUB_REF_NAME ".\dist\eDesk-Setup.exe" ".\edesk-$env:VERSION-install.exe" ".\dist\edesk-update.json" ".\dist\edesk-update.json.sig" --title "eDesk $env:VERSION" --notes "Stable eDesk release with signed automatic-update metadata." --verify-tag
       - name: Upload unsigned eDesk baseline
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
