@@ -12,6 +12,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 
@@ -19,6 +20,7 @@ REPOSITORY = "qtx1356-lang/edesk-client"
 APP_ID = "edesk"
 KEY_ID = "edesk-2026-main"
 SIGNATURE_CONTEXT = b"eDesk update metadata v1\n"
+EXPECTED_PUBLIC_KEY_HEX = "0fbc5a74c218d1eae9a20fff47b55060f2713f2361896e1aef9e294881d5c1d8"
 
 
 def main() -> None:
@@ -52,6 +54,16 @@ def main() -> None:
     if len(seed) != 32:
         raise SystemExit("EDESK_UPDATE_SIGNING_KEY must decode to exactly 32 bytes.")
 
+    signing_key = Ed25519PrivateKey.from_private_bytes(seed)
+    public_key = signing_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    if public_key.hex() != EXPECTED_PUBLIC_KEY_HEX:
+        raise SystemExit(
+            "EDESK_UPDATE_SIGNING_KEY does not match the public key embedded in eDesk."
+        )
+
     digest = hashlib.sha256(package.read_bytes()).hexdigest()
     metadata = {
         "schema_version": 1,
@@ -81,7 +93,7 @@ def main() -> None:
     metadata_bytes = json.dumps(
         metadata, ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")
-    signature = Ed25519PrivateKey.from_private_bytes(seed).sign(
+    signature = signing_key.sign(
         SIGNATURE_CONTEXT + metadata_bytes
     )
     signature_document = {
