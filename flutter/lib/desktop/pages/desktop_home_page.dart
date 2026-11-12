@@ -428,10 +428,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildHelpCards(String updateUrl) {
-    if (!bind.isCustomClient() &&
+    final isEdesk = bind.mainGetAppNameSync().toLowerCase() == 'edesk';
+    final supportsUpdateNotice = isEdesk ||
+        (!bind.isCustomClient() && bind.mainUriPrefixSync().contains('rustdesk'));
+    if (supportsUpdateNotice &&
         updateUrl.isNotEmpty &&
-        !isCardClosed &&
-        bind.mainUriPrefixSync().contains('rustdesk')) {
+        !isCardClosed) {
       final isToUpdate = (isWindows || isMacOS) && bind.mainIsInstalled();
       String btnText = isToUpdate ? 'Update' : 'Download';
       GestureTapCallback onPressed = () async {
@@ -451,7 +453,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           closeButton: true,
           help: isToUpdate ? 'Changelog' : null,
           link: isToUpdate
-              ? 'https://github.com/rustdesk/rustdesk/releases/tag/${bind.mainGetNewVersion()}'
+              ? (isEdesk
+                  ? 'https://github.com/qtx1356-lang/edesk-client/releases/tag/edesk-v${bind.mainGetNewVersion()}'
+                  : 'https://github.com/rustdesk/rustdesk/releases/tag/${bind.mainGetNewVersion()}')
               : null);
     }
     if (systemError.isNotEmpty) {
