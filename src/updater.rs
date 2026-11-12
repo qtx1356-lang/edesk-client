@@ -187,6 +187,15 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
 }
 
 fn check_update(manually: bool) -> ResultType<()> {
+    // eDesk checks its own stable release feed and presents an in-app update notice.
+    // Installation is always user-initiated through the verified download flow below.
+    if crate::common::is_edesk_client() {
+        let option = config::LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
+        if manually || config::option2bool(keys::OPTION_ENABLE_CHECK_UPDATE, &option) {
+            do_check_software_update()?;
+        }
+        return Ok(());
+    }
     // On macOS, auto-update is handled by check_update_as_root() in the service process.
     // The shared check_update() path is only used for manual update checks from the GUI.
     #[cfg(target_os = "macos")]
