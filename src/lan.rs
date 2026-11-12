@@ -28,44 +28,107 @@ pub(super) fn start_listening() -> ResultType<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], get_broadcast_port()));
     let socket = std::net::UdpSocket::bind(addr)?;
     socket.set_read_timeout(Some(std::time::Duration::from_millis(1000)))?;
-    log::info!("lan discovery listener started");
+    let eligible_interfaces = default_net::get_interfaces()
+        .into_iter()
+        .filter(crate::edesk_network::is_allowed_lan_interface)
+        .flat_map(|interface| {
+            interface
+                .ipv4
+                .into_iter()
+                .map(|ipv4| ipv4.addr.to_string())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    log::info!(
+        "eDesk LAN discovery listener started on UDP {}. Eligible IPv4 interfaces: {:?}",
+        get_broadcast_port(),
+        eligible_interfaces
+    );
     loop {
         let mut buf = [0; 2048];
-        if let Ok((len, addr)) = socket.recv_from(&mut buf) {
-            if let Ok(msg_in) = Message::parse_from_bytes(&buf[0..len]) {
-                match msg_in.union {
-                    Some(rendezvous_message::Union::PeerDiscovery(p)) => {
-                        if let Some(nonce) = p.cmd.strip_prefix("ping:").filter(|n| !n.is_empty()) {
-                            if !crate::edesk_network::is_allowed_lan_ip(addr.ip()) {
-                                continue;
-                            }
-                            let id = Config::get_id();
-                            if p.id == id {
-                                continue;
-                            }
-                            if let Some(self_addr) = get_ipaddr_by_peer(&addr) {
-                                let mut msg_out = Message::new();
-                                let mut hostname = crate::whoami_hostname();
-                                // The default hostname is "localhost" which is a bit confusing
-                                if hostname == "localhost" {
-                                    hostname = "unknown".to_owned();
+        match socket.recv_from(&mut buf) {
+            Ok((len, peer_addr)) => {
+                log::debug!(
+                    "eDesk LAN discovery received {} bytes from {}",
+                    len,
+                    peer_addr
+                );
+                match Message::parse_from_bytes(&buf[0..len]) {
+                    Ok(msg_in) => match msg_in.union {
+                        Some(rendezvous_message::Union::PeerDiscovery(p)) => {
+                            if let Some(nonce) =
+                                p.cmd.strip_prefix("ping:").filter(|n| !n.is_empty())
+                            {
+                                if !crate::edesk_network::is_allowed_lan_ip(peer_addr.ip()) {
+                                    log::debug!(
+                                        "eDesk LAN discovery ignored non-local source {}",
+                                        peer_addr
+                                    );
+                                    continue;
                                 }
-                                let peer = PeerDiscovery {
-                                    cmd: format!("pong:{}", nonce),
-                                    mac: get_mac(&self_addr),
-                                    id,
-                                    hostname,
-                                    username: crate::platform::get_active_username(),
-                                    platform: whoami::platform().to_string(),
-                                    ..Default::default()
-                                };
-                                msg_out.set_peer_discovery(peer);
-                                socket.send_to(&msg_out.write_to_bytes()?, addr).ok();
+                                let id = Config::get_id();
+                                if p.id == id {
+                                    continue;
+                                }
+                                if let Some(self_addr) = get_ipaddr_by_peer(&peer_addr) {
+                                    let mut msg_out = Message::new();
+                                    let mut hostname = crate::whoami_hostname();
+                                    if hostname == "localhost" {
+                                        hostname = "unknown".to_owned();
+                                    }
+                                    let peer = PeerDiscovery {
+                                        cmd: format!("pong:{}", nonce),
+                                        mac: get_mac(&self_addr),
+                                        id,
+                                        hostname,
+                                        username: crate::platform::get_active_username(),
+                                        platform: whoami::platform().to_string(),
+                                        ..Default::default()
+                                    };
+                                    msg_out.set_peer_discovery(peer);
+                                    match msg_out.write_to_bytes() {
+                                        Ok(bytes) => match socket.send_to(&bytes, peer_addr) {
+                                            Ok(sent) => log::debug!(
+                                                "eDesk LAN discovery pong sent to {} ({} bytes)",
+                                                peer_addr,
+                                                sent
+                                            ),
+                                            Err(err) => log::warn!(
+                                                "eDesk LAN discovery pong to {} failed: {}",
+                                                peer_addr,
+                                                err
+                                            ),
+                                        },
+                                        Err(err) => log::warn!(
+                                            "eDesk LAN discovery response serialization failed: {}",
+                                            err
+                                        ),
+                                    }
+                                } else {
+                                    log::warn!(
+                                        "eDesk LAN discovery could not select a local route to {}",
+                                        peer_addr
+                                    );
+                                }
                             }
                         }
-                    }
-                    _ => {}
+                        _ => {}
+                    },
+                    Err(err) => log::debug!(
+                        "eDesk LAN discovery ignored malformed packet from {}: {}",
+                        peer_addr,
+                        err
+                    ),
                 }
+            }
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) => {}
+            Err(err) => {
+                log::error!("eDesk LAN discovery receive failed: {}", err);
+                return Err(err.into());
             }
         }
     }
@@ -175,12 +238,33 @@ fn create_broadcast_sockets() -> Vec<UdpSocket> {
     }
     ipv4s.push(Ipv4Addr::UNSPECIFIED); // for robustness
     let mut sockets = Vec::new();
+    let mut unique_ipv4s = HashSet::new();
     for v4_addr in ipv4s {
-        // removing v4_addr.is_private() check, https://github.com/rustdesk/rustdesk/issues/4663
-        if let Ok(s) = UdpSocket::bind(SocketAddr::from((v4_addr, 0))) {
-            if s.set_broadcast(true).is_ok() {
-                sockets.push(s);
-            }
+        if !unique_ipv4s.insert(v4_addr) {
+            continue;
+        }
+        // Bind separately to eligible adapters so multi-homed Windows PCs can
+        // send discovery from the correct local interface.
+        match UdpSocket::bind(SocketAddr::from((v4_addr, 0))) {
+            Ok(socket) => match socket.set_broadcast(true) {
+                Ok(()) => {
+                    log::debug!(
+                        "eDesk LAN discovery broadcast socket bound to {}",
+                        socket.local_addr().map(|addr| addr.to_string()).unwrap_or_default()
+                    );
+                    sockets.push(socket);
+                }
+                Err(err) => log::warn!(
+                    "eDesk LAN discovery could not enable broadcast on {}: {}",
+                    v4_addr,
+                    err
+                ),
+            },
+            Err(err) => log::warn!(
+                "eDesk LAN discovery could not bind local IPv4 {}: {}",
+                v4_addr,
+                err
+            ),
         }
     }
     sockets
@@ -237,17 +321,33 @@ fn send_query() -> ResultType<(Vec<UdpSocket>, String)> {
     // Keep limited broadcast as a fallback for adapters where directed
     // broadcast calculation is unavailable or not supported by the network.
     broadcast_addrs.insert(Ipv4Addr::BROADCAST);
+    let mut sent_count = 0usize;
     for socket in &sockets {
         for broadcast in &broadcast_addrs {
             let target = SocketAddr::from((*broadcast, get_broadcast_port()));
-            if let Err(err) = socket.send_to(&out, target) {
-                log::debug!("LAN discovery broadcast to {} failed: {}", target, err);
+            match socket.send_to(&out, target) {
+                Ok(sent) => {
+                    sent_count += 1;
+                    log::debug!(
+                        "eDesk LAN discovery ping sent from {} to {} ({} bytes)",
+                        socket.local_addr().map(|addr| addr.to_string()).unwrap_or_default(),
+                        target,
+                        sent
+                    );
+                }
+                Err(err) => log::warn!(
+                    "eDesk LAN discovery broadcast to {} failed: {}",
+                    target,
+                    err
+                ),
             }
         }
     }
     log::info!(
-        "LAN discovery ping sent to {} broadcast address(es)",
-        broadcast_addrs.len()
+        "eDesk LAN discovery sent {} ping(s) across {} broadcast address(es) using {} socket(s)",
+        sent_count,
+        broadcast_addrs.len(),
+        sockets.len()
     );
     Ok((sockets, nonce))
 }
@@ -271,6 +371,11 @@ fn wait_response(
     loop {
         let mut buf = [0; 2048];
         if let Ok((len, addr)) = socket.recv_from(&mut buf) {
+            log::debug!(
+                "eDesk LAN discovery received {} bytes from {}",
+                len,
+                addr
+            );
             if let Ok(msg_in) = Message::parse_from_bytes(&buf[0..len]) {
                 match msg_in.union {
                     Some(rendezvous_message::Union::PeerDiscovery(p)) => {
@@ -306,6 +411,11 @@ fn wait_response(
                             };
 
                             if local_mac.is_empty() && p.mac.is_empty() || local_mac != p.mac {
+                                log::info!(
+                                    "eDesk discovered LAN peer at {} ({})",
+                                    addr,
+                                    p.platform
+                                );
                                 allow_err!(tx.send(config::DiscoveryPeer {
                                     id: p.id.clone(),
                                     ip_mac: HashMap::from([
