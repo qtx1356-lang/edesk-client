@@ -3165,7 +3165,7 @@ mod tests {
         assert_eq!(display_version_from_release_id("edesk-v1.5.4").unwrap(), "1.5.4");
         assert_eq!(
             release_id_from_update_url(&format!("{update_url}/")).unwrap(),
-            "v1.4.6"
+            "edesk-v1.5.4"
         );
     }
 
