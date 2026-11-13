@@ -403,9 +403,10 @@ WindowOptions getHiddenTitleBarWindowOptions(
     Size? size,
     bool center = false,
     bool? alwaysOnTop}) {
-  // eDesk uses the standard native title bar so the product name and
-  // Windows window controls remain visible.
-  var defaultTitleBarStyle = TitleBarStyle.normal;
+  // eDesk draws its own Flutter title bar with minimize, maximize, and
+  // close controls in DesktopTab. Hide the native Windows title bar to avoid
+  // displaying two title bars at the same time.
+  var defaultTitleBarStyle = TitleBarStyle.hidden;
   return WindowOptions(
     size: size,
     center: center,
