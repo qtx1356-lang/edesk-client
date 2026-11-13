@@ -42,7 +42,7 @@ class PeerTabModel with ChangeNotifier {
     true,
     !isWeb && bind.mainGetLocalOption(key: "disable-discovery-panel") != "Y",
     !(bind.isDisableAb() || bind.isDisableAccount()),
-    !(bind.isDisableGroupPanel() || bind.isDisableAccount()),
+    false, // eDesk does not use the cloud-only My Group feature.
   ]);
   final List<bool> _isVisible = List.filled(maxTabCount, true, growable: false);
   List<bool> get isVisibleEnabled => () {
