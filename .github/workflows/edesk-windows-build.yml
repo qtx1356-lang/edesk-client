@@ -1,4 +1,5 @@
 name: eDesk Windows x64 build and release
+run-name: eDesk Windows build
 
 on:
   # Automatically build and publish a signed update after changes to the app.
