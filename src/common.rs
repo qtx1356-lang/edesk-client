@@ -2774,7 +2774,8 @@ pub fn is_custom_client() -> bool {
 
 #[inline]
 pub fn is_edesk_client() -> bool {
-    get_app_name().eq_ignore_ascii_case("eDesk")
+    // This repository builds eDesk exclusively. Never use RustDesk's update feed.
+    true
 }
 
 pub fn verify_login(_raw: &str, _id: &str) -> bool {

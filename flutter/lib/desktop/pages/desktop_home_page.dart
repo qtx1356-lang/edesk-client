@@ -428,7 +428,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildHelpCards(String updateUrl) {
-    final isEdesk = bind.mainGetAppNameSync().toLowerCase() == 'edesk';
+    // This repository builds eDesk exclusively; do not fall back to RustDesk links.
+    const isEdesk = true;
     final supportsUpdateNotice = isEdesk ||
         (!bind.isCustomClient() && bind.mainUriPrefixSync().contains('rustdesk'));
     if (supportsUpdateNotice &&
