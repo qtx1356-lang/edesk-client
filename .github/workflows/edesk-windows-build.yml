@@ -86,7 +86,7 @@ jobs:
           Set-Content -Path .\Cargo.toml -Value $manifest -NoNewline
           $lock = Get-Content .\Cargo.lock -Raw
           $lockPattern = '(?ms)(\[\[package\]\]\r?\nname = "rustdesk"\r?\nversion = ")[^"]+(")'
-          $lockUpdated = [regex]::Replace($lock, $lockPattern, [string]::Concat('$1', $version, '$2'), 1)
+          $lockUpdated = [regex]::Replace($lock, $lockPattern, ('${1}' + $version + '${2}'), 1)
           if ($lockUpdated -eq $lock) { throw "Could not update the rustdesk root package version in Cargo.lock." }
           Set-Content -Path .\Cargo.lock -Value $lockUpdated -NoNewline
           Add-Content -Path $env:GITHUB_ENV -Value "VERSION=$version"
