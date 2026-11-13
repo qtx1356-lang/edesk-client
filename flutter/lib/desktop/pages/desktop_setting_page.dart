@@ -75,7 +75,6 @@ class DesktopSettingPage extends StatefulWidget {
         bind.mainGetBuildinOption(key: kOptionHideNetworkSetting) != 'Y')
       SettingsTabKey.network,
     if (!bind.isIncomingOnly()) SettingsTabKey.display,
-    if (!bind.isDisableAccount()) SettingsTabKey.account,
     if (isWindows &&
         !bind.isDisableSettings() &&
         bind.mainGetBuildinOption(key: kOptionHideRemotePrinterSetting) != 'Y')
@@ -2317,14 +2316,6 @@ class __PrinterState extends State<_Printer> {
       ).marginOnly(left: _kCardLeftMargin);
     }
 
-    Widget tipClientNotInstalled() {
-      return Align(
-        alignment: Alignment.topLeft,
-        child:
-            Text(translate('printer-requires-installed-{$appName}-client-tip')),
-      ).marginOnly(left: _kCardLeftMargin);
-    }
-
     Widget tipPrinterNotInstalled() {
       final failedMsg = ''.obs;
       platformFFI.registerEventHandler(
@@ -2381,7 +2372,6 @@ class __PrinterState extends State<_Printer> {
       children.add(tipOsNotSupported());
     } else {
       children.addAll([
-        if (!installed) tipClientNotInstalled(),
         if (installed && !isPrinterInstalled) tipPrinterNotInstalled(),
         if (installed && isPrinterInstalled) tipReady()
       ]);
@@ -2520,49 +2510,15 @@ class _AboutState extends State<_About> {
                   ).marginSymmetric(vertical: 4.0);
                 }),
               ],
-              InkWell(
-                  onTap: () {
-                    launchUrlString('https://rustdesk.com/privacy.html');
-                  },
-                  child: Text(
-                    translate('Privacy Statement'),
-                    style: linkStyle,
-                  ).marginSymmetric(vertical: 4.0)),
-              InkWell(
-                  onTap: () {
-                    launchUrlString('https://rustdesk.com');
-                  },
-                  child: Text(
-                    translate('Website'),
-                    style: linkStyle,
-                  ).marginSymmetric(vertical: 4.0)),
-              Container(
-                decoration: const BoxDecoration(color: Color(0xFF2c8cff)),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
-                child: SelectionArea(
-                    child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\n$license',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          Text(
-                            translate('Slogan_tip'),
-                            style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white),
-                          )
-                        ],
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14.0),
+                child: Text(
+                  'Developed by Sanjiv Sinha',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
-                    ),
-                  ],
-                )),
-              ).marginSymmetric(vertical: 4.0)
+                ),
+              )
             ],
           ).marginOnly(left: _kContentHMargin)
         ]),
