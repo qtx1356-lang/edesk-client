@@ -84,8 +84,8 @@ static CONTROLLING_SESSION_COUNT: AtomicUsize = AtomicUsize::new(0);
 /// Initial wait after startup before the first update check (30 seconds).
 pub const INITIAL_CHECK_DELAY: Duration = Duration::from_secs(30);
 
-/// One full day — default interval between update checks.
-pub const DUR_ONE_DAY: Duration = Duration::from_secs(60 * 60 * 24);
+/// Check periodically so an already-open eDesk window discovers new releases promptly.
+pub const UPDATE_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 60);
 
 /// Minimum interval between consecutive update checks (10 minutes).
 pub const MIN_INTERVAL: Duration = Duration::from_secs(60 * 10);
@@ -159,7 +159,7 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
     }
 
     let mut last_check_time = Instant::now();
-    let mut check_interval = DUR_ONE_DAY;
+    let mut check_interval = UPDATE_CHECK_INTERVAL;
     loop {
         let recv_res = rx_msg.recv_timeout(check_interval);
         match &recv_res {
@@ -178,7 +178,7 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
                     check_interval = RETRY_INTERVAL;
                 } else {
                     last_check_time = Instant::now();
-                    check_interval = DUR_ONE_DAY;
+                    check_interval = UPDATE_CHECK_INTERVAL;
                 }
             }
             Ok(UpdateMsg::Exit) => break,
