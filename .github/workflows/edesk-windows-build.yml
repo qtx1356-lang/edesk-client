@@ -82,7 +82,7 @@ jobs:
           $nextPatch = $highestVersion.Build + 1
           if ($nextPatch -gt 65535) { throw "eDesk patch version exceeded the supported range." }
           $version = "$($highestVersion.Major).$($highestVersion.Minor).$nextPatch"
-          $manifest = [regex]::Replace($manifest, '(?m)^(version\s*=\s*")[0-9]+\.[0-9]+\.[0-9]+(")', [string]::Concat('$1', $version, '$2'), 1)
+          $manifest = [regex]::Replace($manifest, '(?m)^(version\s*=\s*")[0-9]+\.[0-9]+\.[0-9]+(")', ('${1}' + $version + '${2}'), 1)
           Set-Content -Path .\Cargo.toml -Value $manifest -NoNewline
           $lock = Get-Content .\Cargo.lock -Raw
           $lockPattern = '(?ms)(\[\[package\]\]\r?\nname = "rustdesk"\r?\nversion = ")[^"]+(")'
