@@ -559,7 +559,7 @@ abstract class BasePeerCard extends StatelessWidget {
 
   Future<List<mod_menu.PopupMenuEntry<String>>> _buildPopupMenuEntry(
           BuildContext context) async =>
-      (await _buildMenuItems(context))
+      (await _buildConnectionMenuItems(context))
           .map((e) => e.build(
               context,
               const MenuConfig(
@@ -575,30 +575,12 @@ abstract class BasePeerCard extends StatelessWidget {
   @protected
   Future<List<MenuEntryBase<String>>> _buildConnectionMenuItems(
       BuildContext context) async {
-    final List<MenuEntryBase<String>> menuItems = [
+    // Keep the peer action menu focused on the three everyday actions.
+    // Voice calls remain available from the in-session Chat menu.
+    return [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
     ];
-
-    if (peer.platform == kPeerPlatformWindows) {
-      menuItems.add(_terminalRunAsAdminAction(context));
-    }
-
-    if (isDesktop && peer.platform != kPeerPlatformAndroid) {
-      menuItems.add(_tcpTunnelingAction(context));
-    }
-    if (isWindows && peer.platform == kPeerPlatformWindows) {
-      menuItems.add(_rdpAction(context, peer.id));
-    }
-    menuItems.add(MenuEntryDivider<String>());
-    menuItems.add(_requestApprovalAction(context));
-    // menuItems.add(await _openNewConnInOptAction(peer.id));
-    if (!isWeb) {
-      menuItems.add(await _forceAlwaysRelayAction(peer.id));
-    }
-    return menuItems;
   }
 
   MenuEntryButton<String> _connectCommonAction(

@@ -439,7 +439,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       String btnText = isToUpdate ? 'Update' : 'Download';
       GestureTapCallback onPressed = () async {
         final Uri url = Uri.parse(isEdesk
-            ? 'https://github.com/qtx1356-lang/edesk-client/releases/latest'
+            ? 'https://github.com/qtx1356-lang/edesk-client/releases/download/edesk-v${bind.mainGetNewVersion()}/eDesk-Setup.exe'
             : 'https://rustdesk.com/download');
         await launchUrl(url);
       };

@@ -78,32 +78,6 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
               .marginOnly(left: em),
         );
 
-    setupServerWidget() => Flexible(
-          child: Offstage(
-            offstage: !(!_svcStopped.value &&
-                stateGlobal.svcStatus.value == SvcStatus.ready &&
-                _svcIsUsingPublicServer.value),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(', ', style: TextStyle(fontSize: em)),
-                Flexible(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          translate('setup_server_tip'),
-                          style: TextStyle(fontSize: em),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-        );
-
     basicWidget() => Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -126,9 +100,6 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
             ),
             // stop
             if (!isIncomingOnly) startServiceWidget(),
-            // ready && public
-            // No need to show the guide if is custom client.
-            if (!isIncomingOnly) setupServerWidget(),
           ],
         );
 
@@ -590,22 +561,6 @@ class _ConnectionPageState extends State<ConnectionPage>
                                       'Transfer file',
                                       () => onConnect(isFileTransfer: true)
                                     ),
-                                    (
-                                      'View camera',
-                                      () => onConnect(isViewCamera: true)
-                                    ),
-                                    (
-                                      '${translate('Terminal')} (beta)',
-                                      () => onConnect(isTerminal: true)
-                                    ),
-                                    // `connect` routes this through the
-                                    // desktop path only; the peer card gates
-                                    // it the same way.
-                                    if (isDesktop)
-                                      (
-                                        'TCP tunneling',
-                                        () => onConnect(isTcpTunneling: true)
-                                      ),
                                   ]
                                       .map<MenuEntryBase<String>>(
                                           (e) => MenuEntryButton<String>(
