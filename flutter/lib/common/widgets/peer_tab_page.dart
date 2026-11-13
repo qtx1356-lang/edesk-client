@@ -4,7 +4,6 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/widgets/address_book.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
-import 'package:flutter_hbb/common/widgets/my_group.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
 import 'package:flutter_hbb/common/widgets/peer_card.dart';
 import 'package:flutter_hbb/consts.dart';
@@ -61,12 +60,8 @@ class _PeerTabPageState extends State<PeerTabPage>
         ({dynamic hint}) => gFFI.abModel.pullAb(
             force: hint == null ? ForcePullAb.listAndCurrent : null,
             quiet: false)),
-    _TabEntry(
-      MyGroup(
-        menuPadding: _menuPadding(),
-      ),
-      ({dynamic hint}) => gFFI.groupModel.pull(force: hint == null),
-    ),
+    // Reserved index for compatibility with saved tab order; hidden in eDesk.
+    _TabEntry(const SizedBox.shrink()),
   ];
   RelativeRect? mobileTabContextMenuPos;
 
