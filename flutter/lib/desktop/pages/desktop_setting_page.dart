@@ -63,24 +63,8 @@ enum SettingsTabKey {
 
 class DesktopSettingPage extends StatefulWidget {
   final SettingsTabKey initialTabkey;
-  static final List<SettingsTabKey> tabKeys = [
-    if (bind.mainGetBuildinOption(key: kOptionHideGeneralSetting) != 'Y')
-      SettingsTabKey.general,
-    if (!isWeb &&
-        !bind.isOutgoingOnly() &&
-        !bind.isDisableSettings() &&
-        bind.mainGetBuildinOption(key: kOptionHideSecuritySetting) != 'Y')
-      SettingsTabKey.safety,
-    if (!bind.isDisableSettings() &&
-        bind.mainGetBuildinOption(key: kOptionHideNetworkSetting) != 'Y')
-      SettingsTabKey.network,
-    if (!bind.isIncomingOnly()) SettingsTabKey.display,
-    if (isWindows &&
-        !bind.isDisableSettings() &&
-        bind.mainGetBuildinOption(key: kOptionHideRemotePrinterSetting) != 'Y')
-      SettingsTabKey.printer,
-    SettingsTabKey.about,
-  ];
+  // eDesk exposes only the About page; advanced configuration pages are hidden.
+  static final List<SettingsTabKey> tabKeys = [SettingsTabKey.about];
 
   DesktopSettingPage({Key? key, required this.initialTabkey}) : super(key: key);
 
@@ -2463,8 +2447,13 @@ class _AboutState extends State<_About> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(
-                height: 8.0,
+              const SizedBox(height: 8.0),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Text(
+                  'eDesk is a remote desktop application that helps you connect to and work with other computers. It provides remote screen access, attended connections with Accept/Decline approval, file transfer, and voice calls. Use LAN discovery to find computers available on your local network.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ),
               SelectionArea(
                   child: Text('${translate('Version')}: $version')
