@@ -39,15 +39,15 @@ The public verification key is embedded in `src/update_metadata.rs`. The matchin
 
 Its value must be the single base64 line in `EDESK_UPDATE_SIGNING_KEY.txt` supplied separately to the repository owner. In GitHub, open **Settings → Secrets and variables → Actions → New repository secret**, use the exact name above, and paste the file's one-line value. The release workflow derives the public key from this secret and compares it with the embedded trusted public key before signing; a mismatch fails the release. Never commit this file, upload it as a workflow artifact, or paste its contents into source code or a public issue.
 
-## Release procedure
+## Automatic build and release procedure
 
-1. Bump the application version in `Cargo.toml` and the matching root package entry in `Cargo.lock`.
-2. Push a tag that exactly matches the manifest version, for example `edesk-v1.5.5`.
+1. Every push to the `edesk-work` branch starts the Windows build automatically. A manual workflow dispatch is also available.
+2. The workflow reads the latest stable eDesk release, increments the patch version, and embeds that unique version into the build without requiring a source edit.
 3. GitHub Actions builds the Windows app, portable update package, and Inno Setup installer.
-4. The release job signs the metadata using `EDESK_UPDATE_SIGNING_KEY` and publishes all release assets.
-5. The installed eDesk client discovers the stable release and displays the update notice.
+4. The workflow signs the metadata using `EDESK_UPDATE_SIGNING_KEY` and publishes a stable `edesk-vX.Y.Z` GitHub Release automatically.
+5. Installed eDesk clients discover the new release at startup or during their periodic check and show the in-app update notice. The user chooses when to install.
 
-A manual workflow run creates short-lived CI artifacts for testing; it does not publish a public release.
+A failed build or signing step does not publish a release. CI artifacts remain available for diagnostics, but only a fully signed release is offered to installed clients.
 
 ## Verification and safety rules
 
