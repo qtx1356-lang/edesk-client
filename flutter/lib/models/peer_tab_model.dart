@@ -37,12 +37,14 @@ class PeerTabModel with ChangeNotifier {
     IconFont.addressBook,
     IconFont.deviceGroupFill,
   ];
+  // eDesk exposes only LAN-discovered computers. Keep the original five
+  // indices so previously saved tab order/visibility settings remain valid.
   List<bool> isEnabled = List.from([
-    true,
-    true,
+    false, // Recent sessions
+    false, // Favorites
     !isWeb && bind.mainGetLocalOption(key: "disable-discovery-panel") != "Y",
-    !(bind.isDisableAb() || bind.isDisableAccount()),
-    false, // eDesk does not use the cloud-only My Group feature.
+    false, // Address book
+    false, // Accessible devices / cloud-only My Group
   ]);
   final List<bool> _isVisible = List.filled(maxTabCount, true, growable: false);
   List<bool> get isVisibleEnabled => () {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:bot_toast/bot_toast.dart';
@@ -67,8 +68,29 @@ class _PeerTabPageState extends State<PeerTabPage>
 
   final isOptVisiableFixed = isOptionFixed(kOptionPeerTabVisible);
 
+  Timer? _lanDiscoveryTimer;
+
   _PeerTabPageState() {
     _loadLocalOptions();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Refresh LAN discovery while this page is alive. A fresh scan marks
+    // non-responding peers offline and removes them from the visible list.
+    _lanDiscoveryTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted &&
+          gFFI.peerTabModel.currentTab == PeerTabIndex.lan.index) {
+        bind.mainDiscover();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _lanDiscoveryTimer?.cancel();
+    super.dispose();
   }
 
   void _loadLocalOptions() {

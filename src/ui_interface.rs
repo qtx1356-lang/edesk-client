@@ -863,6 +863,7 @@ pub fn get_lan_peers() -> Vec<HashMap<&'static str, String>> {
     config::LanPeers::load()
         .peers
         .iter()
+        .filter(|peer| peer.online)
         .map(|peer| {
             HashMap::<&str, String>::from_iter([
                 ("id", peer.id.clone()),

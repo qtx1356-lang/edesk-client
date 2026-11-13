@@ -495,6 +495,9 @@ async fn handle_received_peers(mut rx: UnboundedReceiver<config::DiscoveryPeer>)
         }
     }
 
+    // Remove peers that did not answer this discovery round. Keeping offline
+    // entries makes computers from a previous network appear indefinitely.
+    peers.retain(|peer| peer.online);
     config::LanPeers::store(&peers);
     #[cfg(feature = "flutter")]
     crate::flutter_ffi::main_load_lan_peers();
