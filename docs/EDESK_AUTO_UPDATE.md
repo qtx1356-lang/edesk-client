@@ -4,7 +4,7 @@
 
 ## User experience
 
-- eDesk checks its own stable GitHub Releases feed at startup and approximately every 24 hours when automatic checks are enabled.
+- eDesk checks its own stable GitHub Releases feed at startup and approximately every hour when automatic checks are enabled.
 - A newer stable version appears on the eDesk home page with the installed and available versions.
 - The user can select **Update** to verify, download, and install the update, or close the notice to postpone it until a later check.
 - **Settings > General > Other** contains **Automatically check for eDesk updates**.
