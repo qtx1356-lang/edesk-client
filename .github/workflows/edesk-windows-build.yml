@@ -1,12 +1,11 @@
 name: eDesk Windows x64 build and release
 
 on:
-  # Build only when requested, or for a versioned eDesk release tag.
-  # This prevents a long Windows build from starting for every small source commit.
-  workflow_dispatch:
+  # Automatically build and publish a signed update after changes to the app.
   push:
-    tags:
-      - "edesk-v*"
+    branches:
+      - edesk-work
+  workflow_dispatch:
 
 concurrency:
   group: edesk-windows-build
