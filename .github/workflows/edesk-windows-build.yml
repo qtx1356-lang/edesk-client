@@ -64,16 +64,19 @@ jobs:
             throw "Could not read the base eDesk version from Cargo.toml."
           }
           $highestVersion = [version]$Matches[1]
-          $releaseJson = gh api repos/qtx1356-lang/edesk-client/releases/latest 2>$null
-          $releaseExitCode = $LASTEXITCODE
-          if ($releaseExitCode -eq 0 -and $releaseJson) {
-            $latestTag = ($releaseJson | ConvertFrom-Json).tag_name
-            if ($latestTag -and $latestTag.StartsWith('edesk-v')) {
-              $latestText = $latestTag.Substring(7)
-              $latestVersion = [version]$latestText
+          # List releases instead of calling /releases/latest: GitHub returns HTTP 404
+          # when the repository has no releases, and PowerShell treats gh stderr as fatal.
+          $releaseJson = gh api repos/qtx1356-lang/edesk-client/releases --paginate
+          if ($LASTEXITCODE -ne 0) { throw "Could not retrieve the eDesk release list." }
+          $releases = @($releaseJson | ConvertFrom-Json)
+          foreach ($release in $releases) {
+            $latestTag = [string]$release.tag_name
+            if ($latestTag -match '^edesk-v([0-9]+\.[0-9]+\.[0-9]+)$') {
+              $latestVersion = [version]$Matches[1]
               if ($latestVersion -gt $highestVersion) { $highestVersion = $latestVersion }
             }
-          } else {
+          }
+          if ($releases.Count -eq 0) {
             Write-Host "No previous stable release found; using the source version."
           }
           $nextPatch = $highestVersion.Build + 1
