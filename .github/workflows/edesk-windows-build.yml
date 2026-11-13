@@ -64,17 +64,16 @@ jobs:
             throw "Could not read the base eDesk version from Cargo.toml."
           }
           $highestVersion = [version]$Matches[1]
-          try {
-            $releaseJson = gh api repos/qtx1356-lang/edesk-client/releases/latest
-            if ($LASTEXITCODE -eq 0) {
-              $latestTag = ($releaseJson | ConvertFrom-Json).tag_name
-              if ($latestTag.StartsWith('edesk-v')) {
-                $latestText = $latestTag.Substring(7)
-                $latestVersion = [version]$latestText
-                if ($latestVersion -gt $highestVersion) { $highestVersion = $latestVersion }
-              }
+          $releaseJson = gh api repos/qtx1356-lang/edesk-client/releases/latest 2>$null
+          $releaseExitCode = $LASTEXITCODE
+          if ($releaseExitCode -eq 0 -and $releaseJson) {
+            $latestTag = ($releaseJson | ConvertFrom-Json).tag_name
+            if ($latestTag -and $latestTag.StartsWith('edesk-v')) {
+              $latestText = $latestTag.Substring(7)
+              $latestVersion = [version]$latestText
+              if ($latestVersion -gt $highestVersion) { $highestVersion = $latestVersion }
             }
-          } catch {
+          } else {
             Write-Host "No previous stable release found; using the source version."
           }
           $nextPatch = $highestVersion.Build + 1
