@@ -594,10 +594,10 @@ class _GeneralState extends State<_General> {
             ),
           ),
       ],
-      if (!isWeb && (!bind.isCustomClient() || isEdesk))
+      if (!isWeb && !isEdesk && !bind.isCustomClient())
         _OptionCheckBox(
           context,
-          isEdesk ? 'Automatically check for eDesk updates' : 'Check for software update on startup',
+          'Check for software update on startup',
           kOptionEnableCheckUpdate,
           isServer: false,
         ),
