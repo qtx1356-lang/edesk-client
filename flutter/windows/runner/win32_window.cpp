@@ -2,6 +2,7 @@
 
 #include <flutter_windows.h>
 #include <shellapi.h>
+#include <shellapi.h>
 #include <shobjidl_core.h>
 
 #include "resource.h"
@@ -245,7 +246,61 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_CLOSE:
+      if (system_tray_enabled_ && !tray_exit_requested_) {
+        ShowWindow(hwnd, SW_HIDE);
+        return 0;
+      }
+      break;
+
+    case WM_APP + 1:
+      if (system_tray_enabled_) {
+        if (lparam == WM_LBUTTONDBLCLK || lparam == WM_LBUTTONUP) {
+          ShowWindow(hwnd, SW_SHOW);
+          ShowWindow(hwnd, SW_RESTORE);
+          SetForegroundWindow(hwnd);
+          return 0;
+        }
+        if (lparam == WM_RBUTTONUP) {
+          HMENU menu = CreatePopupMenu();
+          if (menu) {
+            AppendMenuW(menu, MF_STRING, 1001, L"Open eDesk");
+            AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+            AppendMenuW(menu, MF_STRING, 1002, L"Exit eDesk");
+            POINT point;
+            GetCursorPos(&point);
+            SetForegroundWindow(hwnd);
+            TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_BOTTOMALIGN,
+                           point.x, point.y, 0, hwnd, nullptr);
+            DestroyMenu(menu);
+          }
+          return 0;
+        }
+      }
+      break;
+
+    case WM_COMMAND:
+      if (system_tray_enabled_) {
+        const int command = LOWORD(wparam);
+        if (command == 1001) {
+          ShowWindow(hwnd, SW_SHOW);
+          ShowWindow(hwnd, SW_RESTORE);
+          SetForegroundWindow(hwnd);
+          return 0;
+        }
+        if (command == 1002) {
+          tray_exit_requested_ = true;
+          DestroyWindow(hwnd);
+          return 0;
+        }
+      }
+      break;
+
     case WM_DESTROY:
+      if (system_tray_enabled_ && tray_icon_data_.cbSize != 0) {
+        Shell_NotifyIconW(NIM_DELETE, &tray_icon_data_);
+        tray_icon_data_ = {};
+      }
       window_handle_ = nullptr;
       Destroy();
       if (quit_on_close_) {
@@ -323,6 +378,26 @@ HWND Win32Window::GetHandle() {
 
 void Win32Window::SetQuitOnClose(bool quit_on_close) {
   quit_on_close_ = quit_on_close;
+}
+
+void Win32Window::EnableSystemTray() {
+  if (!window_handle_ || system_tray_enabled_) {
+    return;
+  }
+  tray_icon_data_ = {};
+  tray_icon_data_.cbSize = sizeof(NOTIFYICONDATAW);
+  tray_icon_data_.hWnd = window_handle_;
+  tray_icon_data_.uID = 1;
+  tray_icon_data_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+  tray_icon_data_.uCallbackMessage = WM_APP + 1;
+  tray_icon_data_.hIcon = LoadIconW(GetModuleHandleW(nullptr),
+                                    MAKEINTRESOURCEW(IDI_APP_ICON));
+  wcscpy_s(tray_icon_data_.szTip, L"eDesk");
+  if (Shell_NotifyIconW(NIM_ADD, &tray_icon_data_)) {
+    tray_icon_data_.uVersion = NOTIFYICON_VERSION_4;
+    Shell_NotifyIconW(NIM_SETVERSION, &tray_icon_data_);
+    system_tray_enabled_ = true;
+  }
 }
 
 bool Win32Window::OnCreate() {
