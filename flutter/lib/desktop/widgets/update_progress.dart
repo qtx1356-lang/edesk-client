@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:get/get.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 const _eventKeyUpdateMe = 'update-me';
 
@@ -181,48 +180,18 @@ class UpdateProgressState extends State<UpdateProgress> {
       dialogManager.dismissAll();
     }
 
-    jumplink() async {
-      var opened = false;
-      try {
-        opened = await launchUrl(
-          Uri.parse(releasePageUrl),
-          mode: LaunchMode.externalApplication,
-        );
-      } catch (error) {
-        debugPrint('Failed to open eDesk release page: $error');
-      }
-      if (opened) {
-        dialogManager.dismissAll();
-        return;
-      }
-
-      // Keep the release URL available if Windows cannot start the browser.
+    download() async {
+      // Retry the verified in-app update flow. Never send users to GitHub.
       dialogManager.dismissAll();
-      dialogManager.show(
-        (setState, close, context) => CustomAlertDialog(
-          title: const Text('Could not open the browser'),
-          content: SelectionArea(child: Text(releasePageUrl)),
-          actions: [
-            dialogButton('Copy link', onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: releasePageUrl));
-              showToast('Release link copied.');
-              dialogManager.dismissAll();
-            }),
-            dialogButton('Close', onPressed: () => dialogManager.dismissAll()),
-          ],
-        ),
-        tag: 'edesk-release-link-fallback',
-      );
+      await handleUpdate(releasePageUrl);
     }
 
-    retry() {
+    close() {
       dialogManager.dismissAll();
-      handleUpdate(releasePageUrl);
     }
 
     final List<Widget> buttons = [
-      dialogButton('Download', onPressed: jumplink),
-      dialogButton('Retry', onPressed: retry),
+      dialogButton('Download', onPressed: download),
       dialogButton('Close', onPressed: close),
     ];
     dialogManager.dismissAll();
