@@ -186,10 +186,6 @@ class UpdateProgressState extends State<UpdateProgress> {
       await handleUpdate(releasePageUrl);
     }
 
-    close() {
-      dialogManager.dismissAll();
-    }
-
     final List<Widget> buttons = [
       dialogButton('Download', onPressed: download),
       dialogButton('Close', onPressed: close),
