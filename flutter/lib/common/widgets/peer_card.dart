@@ -601,7 +601,8 @@ abstract class BasePeerCard extends StatelessWidget {
           Text(translate('Audio / Voice Call'), style: style),
       proc: () {
         if (!Get.isRegistered<FFI>(tag: peer.id)) {
-          showToast(translate('Connect first to start an audio call'));
+          pendingVoiceCallPeerIds.add(peer.id);
+          connectInPeerTab(context, peer, tab);
           return;
         }
         final ffi = Get.find<FFI>(tag: peer.id);

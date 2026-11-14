@@ -699,6 +699,10 @@ String formatDurationToTime(Duration duration) {
   return "${totalTime.toString().padLeft(2, "0")}:${mins.toString().padLeft(2, "0")}:${secs.toString().padLeft(2, "0")}";
 }
 
+// Peer IDs queued for a voice call immediately after a newly initiated session
+// receives its first remote frame.
+final Set<String> pendingVoiceCallPeerIds = <String>{};
+
 closeConnection({String? id}) {
   if (isAndroid || isIOS) {
     () async {

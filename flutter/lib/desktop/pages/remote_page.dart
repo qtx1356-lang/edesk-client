@@ -160,6 +160,9 @@ class _RemotePageState extends State<RemotePage>
     }
     Get.put<FFI>(_ffi, tag: widget.id);
     _ffi.imageModel.addCallbackOnFirstImage((String peerId) {
+      if (pendingVoiceCallPeerIds.remove(widget.id)) {
+        bind.sessionRequestVoiceCall(sessionId: _ffi.sessionId);
+      }
       _ffi.canvasModel.activateLocalCursor();
       showKBLayoutTypeChooserIfNeeded(
           _ffi.ffiModel.pi.platform, _ffi.dialogManager);
@@ -652,6 +655,7 @@ class _RemotePageState extends State<RemotePage>
 
   @override
   Future<void> dispose() async {
+    pendingVoiceCallPeerIds.remove(widget.id);
     final closeSession = closeSessionOnDispose.remove(widget.id) ?? true;
 
     // https://github.com/flutter/flutter/issues/64935
