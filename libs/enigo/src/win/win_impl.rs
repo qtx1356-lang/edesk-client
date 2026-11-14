@@ -36,7 +36,24 @@ fn mouse_event(flags: u32, data: u32, dx: i32, dy: i32) -> DWORD {
         type_: INPUT_MOUSE,
         u,
     };
-    unsafe { SendInput(1, &mut input as LPINPUT, size_of::<INPUT>() as c_int) }
+    let result = unsafe {
+        SetLastError(0);
+        SendInput(1, &mut input as LPINPUT, size_of::<INPUT>() as c_int)
+    };
+    if result == 0 {
+        let error = unsafe { GetLastError() };
+        hbb_common::throttled_log!(
+            std::time::Duration::from_secs(5),
+            error,
+            "Windows SendInput rejected mouse event: flags={:#x}, data={}, dx={}, dy={}, last_error={}",
+            flags,
+            data,
+            dx,
+            dy,
+            error
+        );
+    }
+    result
 }
 
 // `v` comes from the remote peer unchecked, so scale in i64 to avoid overflow, and clamp to
