@@ -181,9 +181,38 @@ class UpdateProgressState extends State<UpdateProgress> {
       dialogManager.dismissAll();
     }
 
-    jumplink() {
-      launchUrl(Uri.parse(releasePageUrl));
+    jumplink() async {
+      var opened = false;
+      try {
+        opened = await launchUrl(
+          Uri.parse(releasePageUrl),
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (error) {
+        debugPrint('Failed to open eDesk release page: $error');
+      }
+      if (opened) {
+        dialogManager.dismissAll();
+        return;
+      }
+
+      // Keep the release URL available if Windows cannot start the browser.
       dialogManager.dismissAll();
+      dialogManager.show(
+        (setState, close, context) => CustomAlertDialog(
+          title: const Text('Could not open the browser'),
+          content: SelectionArea(child: Text(releasePageUrl)),
+          actions: [
+            dialogButton('Copy link', onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: releasePageUrl));
+              showToast('Release link copied.');
+              dialogManager.dismissAll();
+            }),
+            dialogButton('Close', onPressed: () => dialogManager.dismissAll()),
+          ],
+        ),
+        tag: 'edesk-release-link-fallback',
+      );
     }
 
     retry() {
