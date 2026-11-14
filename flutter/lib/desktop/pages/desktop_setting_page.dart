@@ -14,6 +14,7 @@ import 'package:flutter_hbb/common/widgets/keyboard_shortcuts/page_body.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_keyboard_shortcuts_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
+import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/mobile/widgets/dialog.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/printer_model.dart';
@@ -2490,12 +2491,25 @@ class _AboutState extends State<_About> {
                   }
                   final updateUrl = stateGlobal.updateUrl.value;
                   final updateError = stateGlobal.updateCheckError.value;
-                  return Text(
-                    updateError.isNotEmpty
-                        ? 'Could not check for eDesk updates: $updateError'
-                        : updateUrl.isEmpty
-                            ? 'eDesk is up to date.'
-                            : 'A new eDesk version is available: ${bind.mainGetNewVersion()}',
+                  if (updateError.isNotEmpty) {
+                    return Text('Could not check for eDesk updates: $updateError')
+                        .marginSymmetric(vertical: 4.0);
+                  }
+                  if (updateUrl.isEmpty) {
+                    return const Text('eDesk is up to date.')
+                        .marginSymmetric(vertical: 4.0);
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('A new eDesk version is available: ${bind.mainGetNewVersion()}'),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed: () => handleUpdate(updateUrl),
+                        icon: const Icon(Icons.system_update_alt),
+                        label: const Text('Download and install update'),
+                      ),
+                    ],
                   ).marginSymmetric(vertical: 4.0);
                 }),
               ],

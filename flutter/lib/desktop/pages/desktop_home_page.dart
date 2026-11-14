@@ -434,7 +434,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     if (supportsUpdateNotice &&
         updateUrl.isNotEmpty &&
         !isCardClosed) {
-      final isToUpdate = (isWindows || isMacOS) && bind.mainIsInstalled();
+      // eDesk on Windows must use the verified in-app updater. Do not
+      // send an installed eDesk client to the first-install setup download
+      // merely because the upstream RustDesk install detector returns false.
+      final isToUpdate = isEdesk && isWindows ||
+          ((isWindows || isMacOS) && bind.mainIsInstalled());
       String btnText = isToUpdate ? 'Update' : 'Download';
       GestureTapCallback onPressed = () async {
         final Uri url = Uri.parse(isEdesk
@@ -449,7 +453,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
       return buildInstallCard(
           "Status",
-          "${translate("new-version-of-{${bind.mainGetAppNameSync()}}-tip")} (${bind.mainGetNewVersion()}).",
+          isEdesk
+              ? "A new eDesk version is available (${bind.mainGetNewVersion()})."
+              : "${translate("new-version-of-{${bind.mainGetAppNameSync()}}-tip")} (${bind.mainGetNewVersion()}).",
           btnText,
           onPressed,
           closeButton: true,
