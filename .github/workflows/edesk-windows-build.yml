@@ -226,7 +226,7 @@ jobs:
           }
           $thumbprint = $certs[0].Thumbprint
           Add-Content -Path $env:GITHUB_ENV -Value "EDESK_SIGNING_THUMBPRINT=$thumbprint"
-          $sdkRoot = Join-Path $env:ProgramFiles "(x86)\Windows Kits\10\bin"
+          $sdkRoot = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
           $signtool = Get-ChildItem $sdkRoot -Filter "signtool.exe" -Recurse |
             Where-Object { $_.FullName -match "\\x64\\signtool.exe$" } |
             Sort-Object FullName -Descending | Select-Object -First 1
@@ -284,7 +284,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:EDESK_SIGNING_THUMBPRINT)) {
             throw "The eSigner certificate thumbprint from the initialization step is missing."
           }
-          $sdkRoot = Join-Path $env:ProgramFiles "(x86)\Windows Kits\10\bin"
+          $sdkRoot = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
           $signtool = Get-ChildItem $sdkRoot -Filter "signtool.exe" -Recurse |
             Where-Object { $_.FullName -match "\\x64\\signtool.exe$" } |
             Sort-Object FullName -Descending | Select-Object -First 1
