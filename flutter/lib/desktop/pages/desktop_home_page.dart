@@ -458,13 +458,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               : "${translate("new-version-of-{${bind.mainGetAppNameSync()}}-tip")} (${bind.mainGetNewVersion()}).",
           btnText,
           onPressed,
-          closeButton: true,
-          help: isToUpdate ? 'Changelog' : null,
-          link: isToUpdate
-              ? (isEdesk
-                  ? 'https://github.com/qtx1356-lang/edesk-client/releases/tag/edesk-v${bind.mainGetNewVersion()}'
-                  : 'https://github.com/rustdesk/rustdesk/releases/tag/${bind.mainGetNewVersion()}')
-              : null);
+          closeButton: true);
     }
     if (systemError.isNotEmpty) {
       return buildInstallCard("", systemError, "", () {});
