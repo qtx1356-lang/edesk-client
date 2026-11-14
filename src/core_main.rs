@@ -88,6 +88,9 @@ pub fn core_main() -> Option<CoreMainAction> {
                 _is_quick_support = true;
             } else if arg == "--no-server" {
                 no_server = true;
+            } else if arg == "--background" {
+                // This is a Flutter UI startup flag, not a Rust core command.
+                flutter_args.push(arg);
             } else {
                 args.push(arg);
             }
@@ -102,8 +105,9 @@ pub fn core_main() -> Option<CoreMainAction> {
         // Because `--server` process is the System user's process. We can't get the arguments in `check_process()`.
         // We can assume that self service running means the server is also running on Windows.
         #[cfg(target_os = "windows")]
-        let should_check_start_tray = crate::platform::is_self_service_running()
-            && crate::platform::is_cur_exe_the_installed();
+        // eDesk owns its notification-area icon in the Windows Flutter runner.
+        // Do not launch RustDesk's separate tray process as that would create a duplicate icon.
+        let should_check_start_tray = false;
         if should_check_start_tray && !crate::check_process("--tray", true) {
             #[cfg(target_os = "linux")]
             hbb_common::allow_err!(crate::platform::check_autostart_config());

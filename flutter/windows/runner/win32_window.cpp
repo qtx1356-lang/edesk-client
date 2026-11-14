@@ -394,8 +394,6 @@ void Win32Window::EnableSystemTray() {
                                     MAKEINTRESOURCEW(IDI_APP_ICON));
   wcscpy_s(tray_icon_data_.szTip, L"eDesk");
   if (Shell_NotifyIconW(NIM_ADD, &tray_icon_data_)) {
-    tray_icon_data_.uVersion = NOTIFYICON_VERSION_4;
-    Shell_NotifyIconW(NIM_SETVERSION, &tray_icon_data_);
     system_tray_enabled_ = true;
   }
 }
