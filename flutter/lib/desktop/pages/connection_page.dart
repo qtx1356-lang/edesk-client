@@ -575,10 +575,7 @@ class _ConnectionPageState extends State<ConnectionPage>
                                                     kDesktopMenuPadding.left),
                                             dismissOnClicked: true,
                                           ))
-                                      .followedBy([
-                                        MenuEntryDivider<String>(),
-                                        _requestApprovalMenu(context),
-                                      ])
+
                                       .map((e) => e.build(
                                           context,
                                           const MenuConfig(

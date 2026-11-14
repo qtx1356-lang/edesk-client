@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../models/peer_model.dart';
+import '../../models/model.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 import '../../desktop/widgets/popup_menu.dart';
@@ -575,12 +576,40 @@ abstract class BasePeerCard extends StatelessWidget {
   @protected
   Future<List<MenuEntryBase<String>>> _buildConnectionMenuItems(
       BuildContext context) async {
-    // Keep the peer action menu focused on the three everyday actions.
-    // Voice calls remain available from the in-session Chat menu.
+    final isConnected = Get.isRegistered<FFI>(tag: peer.id);
     return [
-      _connectAction(context),
+      if (isConnected) _disconnectAction(context) else _connectAction(context),
+      _renameAction(peer.id),
       _transferFileAction(context),
+      _audioCallAction(context),
     ];
+  }
+
+  MenuEntryBase<String> _disconnectAction(BuildContext context) {
+    return MenuEntryButton<String>(
+      childBuilder: (TextStyle? style) =>
+          Text(translate('Disconnect'), style: style),
+      proc: () => closeConnection(id: peer.id),
+      padding: menuPadding,
+      dismissOnClicked: true,
+    );
+  }
+
+  MenuEntryBase<String> _audioCallAction(BuildContext context) {
+    return MenuEntryButton<String>(
+      childBuilder: (TextStyle? style) =>
+          Text(translate('Audio / Voice Call'), style: style),
+      proc: () {
+        if (!Get.isRegistered<FFI>(tag: peer.id)) {
+          showToast(translate('Connect first to start an audio call'));
+          return;
+        }
+        final ffi = Get.find<FFI>(tag: peer.id);
+        bind.sessionRequestVoiceCall(sessionId: ffi.sessionId);
+      },
+      padding: menuPadding,
+      dismissOnClicked: true,
+    );
   }
 
   MenuEntryButton<String> _connectCommonAction(
