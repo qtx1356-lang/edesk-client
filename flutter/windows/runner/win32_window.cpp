@@ -1,6 +1,7 @@
 #include "win32_window.h"
 
 #include <flutter_windows.h>
+#include <shellapi.h>
 #include <shobjidl_core.h>
 
 #include "resource.h"

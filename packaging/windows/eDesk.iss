@@ -41,7 +41,7 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-service"; RunOnceId:
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked\nName: "autostart"; Description: "Start eDesk automatically when I sign in to Windows"; GroupDescription: "Startup options:"; Flags: checkedonce
 
 [Files]
 Source: "..\..\edesk-baseline\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

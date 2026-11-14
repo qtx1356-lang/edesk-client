@@ -158,7 +158,7 @@ void runMainApp(bool startService) async {
     // Check the startup argument, if we successfully handle the argument, we keep the main window hidden.
     final handledByUniLinks = await initUniLinks();
     debugPrint("handled by uni links: $handledByUniLinks");
-    if (handledByUniLinks || handleUriLink(cmdArgs: kBootArgs)) {
+    if (kBootArgs.contains("--background") || handledByUniLinks ||\n        handleUriLink(cmdArgs: kBootArgs)) {
       windowManager.hide();
     } else {
       windowManager.show();

@@ -2,6 +2,7 @@
 #define RUNNER_WIN32_WINDOW_H_
 
 #include <windows.h>
+#include <shellapi.h>
 
 #include <functional>
 #include <memory>
@@ -51,6 +52,8 @@ class Win32Window {
 
   // If true, closing this window will quit the application.
   void SetQuitOnClose(bool quit_on_close);
+  // Keep the main eDesk process alive in the Windows notification area.
+  void EnableSystemTray();
 
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
@@ -88,6 +91,9 @@ class Win32Window {
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
 
   bool quit_on_close_ = false;
+  bool system_tray_enabled_ = false;
+  bool tray_exit_requested_ = false;
+  NOTIFYICONDATAW tray_icon_data_{};
 
   // window handle for top level window.
   HWND window_handle_ = nullptr;
