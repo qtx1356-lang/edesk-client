@@ -14,6 +14,7 @@ import '../../common/formatter/id_formatter.dart';
 import '../../models/peer_model.dart';
 import '../../models/model.dart';
 import '../../models/platform_model.dart';
+import '../../utils/multi_window_manager.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 import '../../desktop/widgets/popup_menu.dart';
 import 'dart:math' as math;
@@ -576,7 +577,8 @@ abstract class BasePeerCard extends StatelessWidget {
   @protected
   Future<List<MenuEntryBase<String>>> _buildConnectionMenuItems(
       BuildContext context) async {
-    final isConnected = Get.isRegistered<FFI>(tag: peer.id);
+    final isConnected = Get.isRegistered<FFI>(tag: peer.id) ||
+        await rustDeskWinManager.isRemotePeerConnected(peer.id);
     return [
       if (isConnected) _disconnectAction(context) else _connectAction(context),
       _renameAction(peer.id),
@@ -589,7 +591,13 @@ abstract class BasePeerCard extends StatelessWidget {
     return MenuEntryButton<String>(
       childBuilder: (TextStyle? style) =>
           Text(translate('Disconnect'), style: style),
-      proc: () => closeConnection(id: peer.id),
+      proc: () async {
+        if (Get.isRegistered<FFI>(tag: peer.id)) {
+          closeConnection(id: peer.id);
+        } else {
+          await rustDeskWinManager.disconnectRemotePeer(peer.id);
+        }
+      },
       padding: menuPadding,
       dismissOnClicked: true,
     );

@@ -479,6 +479,21 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
           isSharedPassword: args['isSharedPassword'],
         ),
       ));
+    } else if (call.method == 'edesk.peer.isConnected') {
+      final peerId = call.arguments?.toString() ?? '';
+      return tabController.state.value.tabs.any((tab) => tab.key == peerId);
+    } else if (call.method == 'edesk.peer.disconnect') {
+      final peerId = call.arguments?.toString() ?? '';
+      final exists =
+          tabController.state.value.tabs.any((tab) => tab.key == peerId);
+      if (exists &&
+          !await desktopTryShowTabAuditDialogCloseCancelled(
+            id: peerId,
+            tabController: tabController,
+          )) {
+        tabController.closeBy(peerId);
+        returnValue = true;
+      }
     } else if (call.method == kWindowDisableGrabKeyboard) {
       // ???
     } else if (call.method == "onDestroy") {

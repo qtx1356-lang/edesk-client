@@ -417,6 +417,37 @@ class RustDeskMultiWindowManager {
     return MultiWindowCallResult(wnds[0], res);
   }
 
+  /// Checks remote-desktop windows because their FFI registrations live in a
+  /// separate Flutter engine and are not visible to the main window's Get registry.
+  Future<bool> isRemotePeerConnected(String peerId) async {
+    if (!isDesktop || peerId.isEmpty) return false;
+    for (final windowId in _remoteDesktopWindows.toList()) {
+      try {
+        final result = await DesktopMultiWindow.invokeMethod(
+            windowId, 'edesk.peer.isConnected', peerId);
+        if (result == true) return true;
+      } catch (e) {
+        debugPrint('Failed to query eDesk remote window $windowId: $e');
+      }
+    }
+    return false;
+  }
+
+  /// Closes the tab hosting [peerId] in whichever remote window owns it.
+  Future<bool> disconnectRemotePeer(String peerId) async {
+    if (!isDesktop || peerId.isEmpty) return false;
+    for (final windowId in _remoteDesktopWindows.toList()) {
+      try {
+        final result = await DesktopMultiWindow.invokeMethod(
+            windowId, 'edesk.peer.disconnect', peerId);
+        if (result == true) return true;
+      } catch (e) {
+        debugPrint('Failed to disconnect peer $peerId in window $windowId: $e');
+      }
+    }
+    return false;
+  }
+
   List<int> _findWindowsByType(WindowType type) {
     switch (type) {
       case WindowType.Main:
