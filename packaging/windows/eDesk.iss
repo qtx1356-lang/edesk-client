@@ -34,6 +34,7 @@ VersionInfoCompany=eDesk
 
 
 [UninstallRun]
+Filename: "{sys}\netsh.exe"; Parameters: 'advfirewall firewall delete rule name="eDesk LAN Discovery"'; Flags: runhidden waituntilterminated
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-service"; RunOnceId: "Remove eDesk background service"; Flags: runhidden waituntilterminated
 
 [Languages]
@@ -50,5 +51,6 @@ Name: "{group}\eDesk"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\eDesk"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+Filename: "{sys}\netsh.exe"; Parameters: 'advfirewall firewall add rule name="eDesk LAN Discovery" dir=in action=allow protocol=UDP localport=21119 remoteip=LocalSubnet profile=any enable=yes'; StatusMsg: "Configuring eDesk local network discovery..."; Flags: runhidden waituntilterminated
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-service"; StatusMsg: "Installing eDesk background service..."; Flags: runhidden waituntilterminated
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch eDesk"; Flags: postinstall nowait skipifsilent
