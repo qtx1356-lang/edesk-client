@@ -40,9 +40,17 @@ impl ProtectedInstallFile {
     }
 
     pub(super) fn copy_verified(source: &Path, expected_sha256: &str) -> ResultType<Self> {
-        let mut source = File::open(source)?;
-        let path = directory::path()?.with_extension("tmp");
-        Self::create(&path, &mut source, Some(expected_sha256))
+        let mut source_file = File::open(source)?;
+        // The staged copy is sometimes launched directly through ShellExecuteEx.
+        // Keep its real executable/package extension: a .tmp file has no Windows
+        // executable association, even when its contents are a verified PE image.
+        let extension = source
+            .extension()
+            .and_then(|value| value.to_str())
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow!("Verified installer source has no file extension: {}", source.display()))?;
+        let path = directory::path()?.with_extension(extension);
+        Self::create(&path, &mut source_file, Some(expected_sha256))
     }
 
     fn create(
