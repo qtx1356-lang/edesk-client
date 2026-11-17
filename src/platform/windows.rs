@@ -4697,7 +4697,18 @@ pub fn is_msi_installed() -> std::io::Result<bool> {
         Ok(key) => key,
         // EXE-installed builds may not have an MSI registry entry. That is
         // expected and must not block the in-app updater.
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        // Windows registry lookup may report ERROR_FILE_NOT_FOUND (2) without
+        // mapping it to ErrorKind::NotFound in every winreg/Windows combination.
+        // An absent MSI uninstall key is normal for an Inno Setup EXE install;
+        // treat it as an EXE install so the in-app updater can continue.
+        Err(err)
+            if err.kind() == std::io::ErrorKind::NotFound || err.raw_os_error() == Some(2) =>
+        {
+            log::debug!(
+                "No MSI installer registry key found for eDesk; using the EXE update package"
+            );
+            return Ok(false);
+        }
         Err(err) => return Err(err),
     };
     match install_key.get_value::<u32, _>(REG_NAME_WINDOWS_INSTALLER) {
