@@ -3,7 +3,7 @@ use crate::{
     hbbs_http::create_http_client_with_url_strict,
     update_metadata::{UpdateArtifactQuery, UpdateMetadataRequirements, VerifiedUpdateArtifact},
 };
-use hbb_common::{bail, ResultType};
+use hbb_common::{anyhow::Context, bail, ResultType};
 use std::{
     io::Read,
     path::{Component, Path, PathBuf},
@@ -104,14 +104,18 @@ pub(super) fn verified_update_artifact_from_release_page_url(
     update_url: &str,
     query: &UpdateArtifactQuery<'_>,
 ) -> ResultType<VerifiedUpdateArtifact> {
-    let release_id = release_id_from_update_url(update_url)?;
-    let display_version = display_version_from_release_id(&release_id)?;
+    let release_id = release_id_from_update_url(update_url)
+        .context("Update preparation: could not parse the GitHub release tag")?;
+    let display_version = display_version_from_release_id(&release_id)
+        .context("Update preparation: could not determine the release version")?;
     let expected_artifact_url_prefix =
         format!("https://github.com/qtx1356-lang/edesk-client/releases/download/{release_id}/");
     let metadata_url = format!("{expected_artifact_url_prefix}edesk-update.json");
     let signature_url = format!("{metadata_url}.sig");
-    let metadata_bytes = fetch_update_sidecar_bytes(&metadata_url)?;
-    let signature_bytes = fetch_update_sidecar_bytes(&signature_url)?;
+    let metadata_bytes = fetch_update_sidecar_bytes(&metadata_url)
+        .context("Update preparation: could not retrieve edesk-update.json")?;
+    let signature_bytes = fetch_update_sidecar_bytes(&signature_url)
+        .context("Update preparation: could not retrieve edesk-update.json.sig")?;
     let requirements = UpdateMetadataRequirements {
         expected_version: display_version.as_str(),
         expected_release_id: release_id.as_str(),
@@ -119,17 +123,20 @@ pub(super) fn verified_update_artifact_from_release_page_url(
         artifact: *query,
     };
     crate::update_metadata::verify_update_metadata(&metadata_bytes, &signature_bytes, requirements)
+        .context("Update preparation: signed metadata validation failed")
 }
 
 fn fetch_update_sidecar_bytes(url: &str) -> ResultType<Vec<u8>> {
-    let client = create_http_client_with_url_strict(url)?;
+    let client = create_http_client_with_url_strict(url)
+        .with_context(|| format!("Could not create a secure HTTPS client for update metadata URL: {url}"))?;
     let mut response = client
         .get(url)
         .timeout(UPDATE_SIDECAR_HTTP_REQUEST_TIMEOUT)
-        .send()?;
+        .send()
+        .with_context(|| format!("Network request failed while retrieving update metadata: {url}"))?;
     if !response.status().is_success() {
         bail!(
-            "Failed to download update metadata sidecar: {}",
+            "Update metadata server returned HTTP {} for {url}",
             response.status()
         );
     }

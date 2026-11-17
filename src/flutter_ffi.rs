@@ -2864,7 +2864,9 @@ fn verified_update_artifact_for_release_page_url(
     release_page_url: &str,
 ) -> ResultType<crate::update_metadata::VerifiedUpdateArtifact> {
     #[cfg(target_os = "windows")]
-    let update_msi = crate::platform::windows::is_msi_installed()? && !crate::is_custom_client();
+    let update_msi = crate::platform::windows::is_msi_installed()
+        .context("Update preparation: could not identify the installed eDesk installer type")?
+        && !crate::is_custom_client();
     #[cfg(target_os = "macos")]
     let update_msi = false;
     let query = crate::updater::current_update_artifact_query(update_msi);
