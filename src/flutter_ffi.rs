@@ -2819,7 +2819,7 @@ pub fn main_get_common(key: String) -> String {
             {
                 return match verified_update_artifact_for_release_page_url(release_page_url) {
                     Ok(artifact) => artifact.url,
-                    Err(e) => format!("error:{}", e),
+                    Err(e) => format!("error:{:#}", e),
                 };
             }
             #[cfg(not(any(target_os = "windows", target_os = "macos")))]
@@ -2950,7 +2950,7 @@ pub fn main_set_common(_key: String, _value: String) {
                     }
                     Err(e) => HashMap::from([
                         ("name", event_key),
-                        ("error", format!("Failed to verify update metadata, {}", e)),
+                        ("error", format!("Failed to verify update metadata, {:#}", e)),
                     ]),
                 };
             let _res = flutter::push_global_event(
