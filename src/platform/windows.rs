@@ -4691,9 +4691,21 @@ fn get_pids<S: AsRef<str>>(name: S) -> ResultType<Vec<u32>> {
 pub fn is_msi_installed() -> std::io::Result<bool> {
     let (subkey, _, _, _) = get_install_info();
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let install_key = hklm.open_subkey(subkey.strip_prefix(HKLM_PREFIX).unwrap_or(&subkey))?;
-    Ok(MSI_WINDOWS_INSTALLER_VALUE
-        == install_key.get_value::<u32, _>(REG_NAME_WINDOWS_INSTALLER)?)
+    let install_key = match hklm
+        .open_subkey(subkey.strip_prefix(HKLM_PREFIX).unwrap_or(&subkey))
+    {
+        Ok(key) => key,
+        // EXE-installed builds may not have an MSI registry entry. That is
+        // expected and must not block the in-app updater.
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(err) => return Err(err),
+    };
+    match install_key.get_value::<u32, _>(REG_NAME_WINDOWS_INSTALLER) {
+        Ok(value) => Ok(value == MSI_WINDOWS_INSTALLER_VALUE),
+        // A missing WindowsInstaller value also means this is not an MSI install.
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(err),
+    }
 }
 
 pub fn is_cur_exe_the_installed() -> bool {
