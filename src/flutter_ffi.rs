@@ -2865,13 +2865,38 @@ fn verified_update_artifact_for_release_page_url(
     release_page_url: &str,
 ) -> ResultType<crate::update_metadata::VerifiedUpdateArtifact> {
     #[cfg(target_os = "windows")]
-    let update_msi = crate::platform::windows::is_msi_installed()
-        .context("Update preparation: could not identify the installed eDesk installer type")?
-        && !crate::is_custom_client();
+    let update_msi = {
+        let detected = crate::platform::windows::is_msi_installed()
+            .with_context(|| {
+                format!(
+                    "Update preparation: could not identify the installed eDesk installer type (Windows error details unavailable; release URL: {release_page_url})"
+                )
+            })?;
+        let use_msi = detected && !crate::is_custom_client();
+        log::info!(
+            "eDesk updater: detected installer type; MSI installed={detected}, custom client={}, selected format={}",
+            crate::is_custom_client(),
+            if use_msi { "msi" } else { "exe" }
+        );
+        use_msi
+    };
     #[cfg(target_os = "macos")]
     let update_msi = false;
     let query = crate::updater::current_update_artifact_query(update_msi);
+    log::info!(
+        "eDesk updater: verifying release metadata; platform={}, arch={}, format={}, release={}",
+        query.platform,
+        query.arch,
+        query.format,
+        release_page_url
+    );
     crate::updater::verified_update_artifact_for_release_page_url(release_page_url, query)
+        .with_context(|| {
+            format!(
+                "Update preparation failed for platform={}, arch={}, format={}",
+                query.platform, query.arch, query.format
+            )
+        })
 }
 
 pub fn main_set_common(_key: String, _value: String) {
