@@ -80,8 +80,39 @@ fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
     // eDesk's protected staging and mandatory SHA-256 verification. This avoids
     // routing the EXE through an intermediate cmd.exe script and temporary copy.
     let update = ProtectedInstallFile::copy_verified(Path::new(exe), expected_sha256)?;
-    let process = launch_elevated(update.path(), "--update", false)
-        .map_err(|err| anyhow!("Windows could not launch the verified update installer: {err:#}"))?;
+    let staged_path = update.path();
+    let staged_metadata = std::fs::metadata(staged_path).map_err(|err| {
+        anyhow!(
+            "Verified update staging file is missing or inaccessible (source: {}, staged: {}): {err}",
+            exe,
+            staged_path.display()
+        )
+    })?;
+    if !staged_metadata.is_file() {
+        bail!(
+            "Verified update staging path is not a regular file: {}",
+            staged_path.display()
+        );
+    }
+    if staged_path.extension().and_then(|value| value.to_str()) != Some("exe") {
+        bail!(
+            "Verified update staging file does not have an .exe extension: {}",
+            staged_path.display()
+        );
+    }
+    log::info!(
+        "Launching verified eDesk update installer: source={}, staged={}, size={} bytes",
+        exe,
+        staged_path.display(),
+        staged_metadata.len()
+    );
+    let process = launch_elevated(staged_path, "--update", false).map_err(|err| {
+        anyhow!(
+            "Windows could not launch the verified update installer at {}: {err:#}",
+            staged_path.display()
+        )
+    })?;
+    log::info!("Windows accepted the verified eDesk update installer launch.");
     let exit_code = process
         .wait()
         .map_err(|err| anyhow!("Could not wait for the verified update installer: {err:#}"))?;
