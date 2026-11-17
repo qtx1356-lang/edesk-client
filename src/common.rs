@@ -1183,31 +1183,62 @@ fn notify_software_update_check_error(error: &str) {
     }
 }
 
+// Select the newest published stable release only when its installer and both
+// signed-metadata sidecars are present and match the release version. This follows
+// TallyAudit's release-list + exact asset pairing approach instead of trusting
+// /releases/latest or assuming an installer exists for a tag.
+fn latest_stable_edesk_release_id(releases: &Value) -> Option<String> {
+    let releases = releases.as_array()?;
+    releases
+        .iter()
+        .filter_map(|release| {
+            if release.get("draft").and_then(Value::as_bool) != Some(false)
+                || release.get("prerelease").and_then(Value::as_bool) != Some(false)
+            {
+                return None;
+            }
+            let tag = release.get("tag_name")?.as_str()?;
+            let tag_url = format!(
+                "https://github.com/qtx1356-lang/edesk-client/releases/tag/{tag}"
+            );
+            let release_id = release_id_from_update_url(&tag_url).ok()?;
+            let version = display_version_from_release_id(&release_id).ok()?;
+            let assets = release.get("assets")?.as_array()?;
+            let asset_names = assets
+                .iter()
+                .filter_map(|asset| asset.get("name").and_then(Value::as_str))
+                .collect::<std::collections::HashSet<_>>();
+            let installer = format!("edesk-{version}-install.exe");
+            if !asset_names.contains(installer.as_str())
+                || !asset_names.contains("edesk-update.json")
+                || !asset_names.contains("edesk-update.json.sig")
+            {
+                return None;
+            }
+            Some((get_version_number(&version), release_id))
+        })
+        .max_by_key(|(version, _)| *version)
+        .map(|(_, release_id)| release_id)
+}
+
 fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
-    // GitHub's /releases/latest endpoint excludes drafts and prereleases. Still validate
-    // the returned tag and construct the release URL ourselves rather than trusting a URL
-    // supplied by the response body.
+    // GitHub's paginated Releases API lets us validate stable tags and their exact
+    // installer/metadata assets. Invalid, draft, prerelease, or incomplete releases
+    // are skipped rather than accidentally pairing one release with another's installer.
     let resp: Value = serde_json::from_slice(&bytes)?;
-    if resp.get("draft").and_then(Value::as_bool).unwrap_or(true)
-        || resp.get("prerelease").and_then(Value::as_bool).unwrap_or(true)
-    {
-        clear_software_update_url();
-        return Ok(());
-    }
-    let release_id = resp
-        .get("tag_name")
-        .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("eDesk release response is missing tag_name"))?;
-    let response_url = format!(
-        "https://github.com/qtx1356-lang/edesk-client/releases/tag/{release_id}"
-    );
-    let release_id = release_id_from_update_url(&response_url)?;
-    let latest_release_version = display_version_from_release_id(&release_id)?;
-    let update_url = if get_version_number(&latest_release_version) > get_version_number(crate::VERSION) {
-        response_url
-    } else {
-        String::new()
-    };
+    let release_id = latest_stable_edesk_release_id(&resp);
+    let update_url = release_id
+        .and_then(|release_id| {
+            let version = display_version_from_release_id(&release_id).ok()?;
+            if get_version_number(&version) > get_version_number(crate::VERSION) {
+                Some(format!(
+                    "https://github.com/qtx1356-lang/edesk-client/releases/tag/{release_id}"
+                ))
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default();
     *SOFTWARE_UPDATE_URL.lock().unwrap() = update_url.clone();
     // Always report the result so the About page can show "up to date" after a manual check.
     notify_software_update_check_finish(&update_url);
@@ -1217,7 +1248,7 @@ fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
 // The eDesk updater deliberately uses only this repository's stable GitHub release feed.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
-    let url = "https://api.github.com/repos/qtx1356-lang/edesk-client/releases/latest";
+    let url = "https://api.github.com/repos/qtx1356-lang/edesk-client/releases?per_page=100";
     let proxy_conf = Config::get_socks();
     let tls_url = get_url_for_tls(&url, &proxy_conf);
     let tls_type = get_cached_tls_type(tls_url);
@@ -3184,6 +3215,50 @@ mod tests {
         for uuid in ["", "\r\nPING\r\n", "a b", "a\0", too_long.as_str()] {
             assert!(check_relay_uuid(uuid).is_err(), "accepted {uuid:?}");
         }
+    }
+
+    #[test]
+    fn release_discovery_requires_matching_versioned_installer_and_signed_sidecars() {
+        let release = |tag: &str, draft: bool, prerelease: bool, assets: Vec<&str>| {
+            serde_json::json!({
+                "tag_name": tag,
+                "draft": draft,
+                "prerelease": prerelease,
+                "assets": assets.into_iter().map(|name| serde_json::json!({"name": name})).collect::<Vec<_>>()
+            })
+        };
+        let releases = serde_json::json!([
+            release("edesk-v1.5.99", true, false, vec![
+                "edesk-1.5.99-install.exe", "edesk-update.json", "edesk-update.json.sig"
+            ]),
+            release("edesk-v1.5.98", false, true, vec![
+                "edesk-1.5.98-install.exe", "edesk-update.json", "edesk-update.json.sig"
+            ]),
+            release("edesk-v1.5.97", false, false, vec![
+                "edesk-1.5.96-install.exe", "edesk-update.json", "edesk-update.json.sig"
+            ]),
+            release("edesk-v1.5.18", false, false, vec![
+                "edesk-1.5.18-install.exe", "edesk-update.json", "edesk-update.json.sig"
+            ]),
+            release("edesk-v1.5.17", false, false, vec![
+                "edesk-1.5.17-install.exe", "edesk-update.json", "edesk-update.json.sig"
+            ])
+        ]);
+        assert_eq!(
+            latest_stable_edesk_release_id(&releases).as_deref(),
+            Some("edesk-v1.5.18")
+        );
+    }
+
+    #[test]
+    fn release_discovery_rejects_missing_signed_sidecars() {
+        let releases = serde_json::json!([{
+            "tag_name": "edesk-v1.5.18",
+            "draft": false,
+            "prerelease": false,
+            "assets": [{"name": "edesk-1.5.18-install.exe"}]
+        }]);
+        assert_eq!(latest_stable_edesk_release_id(&releases), None);
     }
 
     #[test]
