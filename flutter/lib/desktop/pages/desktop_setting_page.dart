@@ -2452,7 +2452,7 @@ class _AboutState extends State<_About> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
                 child: Text(
-                  'eDesk is a remote desktop application that helps you connect to and work with other computers. It provides remote screen access, attended connections with Accept/Decline approval, file transfer, and voice calls. Use LAN discovery to find computers available on your local network.',
+                  'eDesk is a remote desktop application that helps you connect to and work with other computers. It provides remote screen access, attended connections with Accept/Decline approval, file transfer, and voice calls. Use LAN discovery to find computers available on your local network. When an update is available, eDesk downloads and installs it through the in-app updater.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
