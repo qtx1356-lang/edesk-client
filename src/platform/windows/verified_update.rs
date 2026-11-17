@@ -4,7 +4,7 @@ use super::{
     get_custom_client_staging_dir, get_reg_of_hkcr, handle_custom_client_staging_dir_before_update,
     installer_files::ProtectedInstallFile,
     installer_handoff::{run_cmds, InstallCommands},
-    installer_shell::path_for_cmd_environment,
+    installer_shell::{launch_elevated, path_for_cmd_environment},
     remove_custom_client_staging_dir, ResultType, REG_NAME_INSTALL_PRINTER,
 };
 use hbb_common::{allow_err, anyhow::anyhow, bail, log};
@@ -76,22 +76,19 @@ fn launch_verified_update(
 }
 
 fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
+    // Use the direct Windows installer handoff used by TallyAudit, while retaining
+    // eDesk's protected staging and mandatory SHA-256 verification. This avoids
+    // routing the EXE through an intermediate cmd.exe script and temporary copy.
     let update = ProtectedInstallFile::copy_verified(Path::new(exe), expected_sha256)?;
-    let source = path_for_cmd_environment(update.path())?;
-    let commands = format!(
-        "set \"RUSTDESK_VERIFIED_EXE_SOURCE={source}\"\r\n\
-         set \"RUSTDESK_VERIFIED_EXE=%RUSTDESK_OUTPUT_DIR%\\{VERIFIED_EXE_FILENAME}\"\r\n\
-         copy /B /Y \"%RUSTDESK_VERIFIED_EXE_SOURCE%\" \"%RUSTDESK_VERIFIED_EXE%\" > nul || exit /b {VERIFIED_UPDATE_COPY_FAILURE_EXIT_CODE}\r\n\
-         start \"\" /wait \"%RUSTDESK_VERIFIED_EXE%\" --update || exit /b {VERIFIED_EXE_LAUNCH_FAILURE_EXIT_CODE}"
-    );
-    run_cmds(
-        InstallCommands {
-            script: commands,
-            files: vec![update],
-        },
-        false,
-        "update-exe",
-    )
+    let process = launch_elevated(update.path(), "--update", false)
+        .map_err(|err| anyhow!("Windows could not launch the verified update installer: {err:#}"))?;
+    let exit_code = process
+        .wait()
+        .map_err(|err| anyhow!("Could not wait for the verified update installer: {err:#}"))?;
+    if exit_code != 0 {
+        bail!("Verified update installer exited with code {exit_code}");
+    }
+    Ok(())
 }
 
 fn verified_msi_install_commands(msi: &Path, quiet: bool) -> ResultType<String> {
