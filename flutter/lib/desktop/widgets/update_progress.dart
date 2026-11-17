@@ -42,7 +42,7 @@ Future<void> handleUpdate(String releasePageUrl) async {
   gFFI.dialogManager.dismissAll();
   gFFI.dialogManager.show((setState, close, context) {
     return CustomAlertDialog(
-        title: Text(translate('Downloading {$appName}')),
+        title: const Text('Downloading eDesk'),
         content: UpdateProgress(
                 releasePageUrl, verifiedDownloadUrl, downloadId, onCanceled)
             .marginSymmetric(horizontal: 8)
