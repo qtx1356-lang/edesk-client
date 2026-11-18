@@ -41,15 +41,15 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-service"; RunOnceId:
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 Name: "autostart"; Description: "Start eDesk automatically when I sign in to Windows"; GroupDescription: "Startup options:"; Flags: checkedonce
 
 [Files]
 Source: "..\..\edesk-baseline\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\\..\\flutter\\windows\\runner\\resources\\app_icon.ico"; DestDir: "{app}"; DestName: "eDesk.ico"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\eDesk"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\eDesk"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{group}\\eDesk"; Filename: "{app}\\{#MyAppExeName}"; IconFilename: "{app}\\eDesk.ico"
+Name: "{autodesktop}\\eDesk"; Filename: "{app}\\{#MyAppExeName}"; IconFilename: "{app}\\eDesk.ico"
 
 [Run]
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""eDesk LAN Discovery"" dir=in action=allow protocol=UDP localport=21119 remoteip=LocalSubnet profile=any enable=yes"; StatusMsg: "Configuring eDesk local network discovery..."; Flags: runhidden waituntilterminated
