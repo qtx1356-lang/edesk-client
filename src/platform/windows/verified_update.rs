@@ -103,22 +103,38 @@ fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
         );
     }
     let staged_path = path_for_cmd_environment(staged_path)?;
+    let current_exe = std::env::current_exe()?;
+    let install_dir = current_exe
+        .parent()
+        .ok_or_else(|| anyhow!("Installed eDesk executable has no parent directory"))?;
+    let install_dir = path_for_cmd_environment(install_dir)?;
     log::info!(
-        "Handing verified eDesk update installer to elevated runner: source={}, staged={}, size={} bytes",
+        "Handing verified eDesk setup installer to elevated runner: source={}, staged={}, install_dir={}, size={} bytes",
         exe,
         staged_path,
+        install_dir,
         staged_metadata.len()
+    );
+
+    // The release EXE is the Inno Setup installer, not the portable packer.
+    // Inno Setup's CloseApplications support handles the running eDesk process,
+    // while /DIR preserves custom install locations. Capture its actual exit
+    // status so a failed install cannot be reported as a successful update.
+    let script = format!(
+        "\"{staged_path}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /DIR=\"{install_dir}\"\r\n\\
+         set \"RUSTDESK_SETUP_EXIT_CODE=%ERRORLEVEL%\"\r\n\\
+         if not \"%RUSTDESK_SETUP_EXIT_CODE%\"==\"0\" exit /b %RUSTDESK_SETUP_EXIT_CODE%"
     );
     run_cmds(
         InstallCommands {
-            script: format!("\"{staged_path}\" --update"),
+            script,
             files: vec![update],
         },
         false,
         "update-exe",
     )
-    .map_err(|err| anyhow!("Failed to hand off verified update installer: {err:#}"))?;
-    log::info!("Verified eDesk update installer completed successfully.");
+    .map_err(|err| anyhow!("Verified eDesk setup installation failed: {err:#}"))?;
+    log::info!("Verified eDesk setup installer completed successfully.");
     Ok(())
 }
 
