@@ -4,7 +4,7 @@ use super::{
     get_custom_client_staging_dir, get_reg_of_hkcr, handle_custom_client_staging_dir_before_update,
     installer_files::ProtectedInstallFile,
     installer_handoff::{run_cmds, InstallCommands},
-    installer_shell::{launch_elevated, path_for_cmd_environment},
+    installer_shell::path_for_cmd_environment,
     remove_custom_client_staging_dir, ResultType, REG_NAME_INSTALL_PRINTER,
 };
 use hbb_common::{allow_err, anyhow::anyhow, bail, log};
@@ -76,9 +76,11 @@ fn launch_verified_update(
 }
 
 fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
-    // Use the direct Windows installer handoff used by TallyAudit, while retaining
-    // eDesk's protected staging and mandatory SHA-256 verification. This avoids
-    // routing the EXE through an intermediate cmd.exe script and temporary copy.
+    // Keep the SHA-256-verified, protected staging copy, but hand it to the
+    // elevated command runner rather than ShellExecuteEx directly. run_cmds
+    // releases the staging file's retained DELETE handle before cmd.exe starts;
+    // otherwise the installer can encounter a sharing violation while Windows
+    // opens or replaces the executable during the update.
     let update = ProtectedInstallFile::copy_verified(Path::new(exe), expected_sha256)?;
     let staged_path = update.path();
     let staged_metadata = std::fs::metadata(staged_path).map_err(|err| {
@@ -100,25 +102,23 @@ fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
             staged_path.display()
         );
     }
+    let staged_path = path_for_cmd_environment(staged_path)?;
     log::info!(
-        "Launching verified eDesk update installer: source={}, staged={}, size={} bytes",
+        "Handing verified eDesk update installer to elevated runner: source={}, staged={}, size={} bytes",
         exe,
-        staged_path.display(),
+        staged_path,
         staged_metadata.len()
     );
-    let process = launch_elevated(staged_path, "--update", false).map_err(|err| {
-        anyhow!(
-            "Windows could not launch the verified update installer at {}: {err:#}",
-            staged_path.display()
-        )
-    })?;
-    log::info!("Windows accepted the verified eDesk update installer launch.");
-    let exit_code = process
-        .wait()
-        .map_err(|err| anyhow!("Could not wait for the verified update installer: {err:#}"))?;
-    if exit_code != 0 {
-        bail!("Verified update installer exited with code {exit_code}");
-    }
+    run_cmds(
+        InstallCommands {
+            script: format!("\\\"{staged_path}\\\" --update"),
+            files: vec![update],
+        },
+        false,
+        "update-exe",
+    )
+    .map_err(|err| anyhow!("Failed to hand off verified update installer: {err:#}"))?;
+    log::info!("Verified eDesk update installer completed successfully.");
     Ok(())
 }
 
