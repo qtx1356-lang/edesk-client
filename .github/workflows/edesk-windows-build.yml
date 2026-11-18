@@ -236,17 +236,6 @@ jobs:
           & $signtool.FullName verify /pa /all /v ".\edesk-baseline\edesk.exe"
           if ($LASTEXITCODE -ne 0) { throw "Authenticode verification of edesk.exe failed." }
 
-      - name: Build complete eDesk self-update package
-        shell: powershell
-        run: |
-          python3 -m pip install --disable-pip-version-check -r .\libs\portable\requirements.txt
-          python3 .\libs\portable\generate.py -f .\edesk-baseline -o .\libs\portable -e .\edesk-baseline\edesk.exe
-          if ($LASTEXITCODE -ne 0) { throw "eDesk portable update package build failed." }
-          Copy-Item .\target\release\rustdesk-portable-packer.exe ".\edesk-$env:VERSION-install.exe" -Force
-          if (-not (Test-Path ".\edesk-$env:VERSION-install.exe")) {
-            throw "eDesk self-update package was not created."
-          }
-
       - name: Report package size
         shell: powershell
         run: |
@@ -274,6 +263,10 @@ jobs:
           & $isccPath "/DMyAppVersion=$env:VERSION" .\packaging\windows\eDesk.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed with exit code $LASTEXITCODE." }
           if (-not (Test-Path .\dist\eDesk-Setup.exe)) { throw "eDesk-Setup.exe was not created." }
+          Copy-Item .\dist\eDesk-Setup.exe ".\edesk-$env:VERSION-install.exe" -Force
+          if (-not (Test-Path ".\edesk-$env:VERSION-install.exe")) {
+            throw "The signed self-update installer asset was not created."
+          }
 
 
       - name: Sign eDesk installer and self-update executable
