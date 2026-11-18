@@ -121,9 +121,7 @@ fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
     // while /DIR preserves custom install locations. Capture its actual exit
     // status so a failed install cannot be reported as a successful update.
     let script = format!(
-        "\"{staged_path}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /DIR=\"{install_dir}\"\r\n\\
-         set \"RUSTDESK_SETUP_EXIT_CODE=%ERRORLEVEL%\"\r\n\\
-         if not \"%RUSTDESK_SETUP_EXIT_CODE%\"==\"0\" exit /b %RUSTDESK_SETUP_EXIT_CODE%"
+        "\"{staged_path}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /DIR=\"{install_dir}\"\r\nset \"RUSTDESK_SETUP_EXIT_CODE=%ERRORLEVEL%\"\r\nif not \"%RUSTDESK_SETUP_EXIT_CODE%\"==\"0\" exit /b %RUSTDESK_SETUP_EXIT_CODE%"
     );
     run_cmds(
         InstallCommands {
