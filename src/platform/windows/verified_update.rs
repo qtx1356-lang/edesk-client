@@ -111,7 +111,7 @@ fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
     );
     run_cmds(
         InstallCommands {
-            script: format!("\\\"{staged_path}\\\" --update"),
+            script: format!("\"{staged_path}\" --update"),
             files: vec![update],
         },
         false,
