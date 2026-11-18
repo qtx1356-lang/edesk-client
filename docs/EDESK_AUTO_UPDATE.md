@@ -20,7 +20,7 @@ The only update source is:
 
 Stable release tags use `edesk-vX.Y.Z`. Drafts and prereleases are excluded. The client constructs and validates the release URL itself rather than trusting a URL from the API response.
 
-The update payload `edesk-X.Y.Z-install.exe` is a copy of the Inno Setup installer used for first installation. It is launched through the verified elevated handoff with silent-update options and the exact directory of the running eDesk executable. Inno Setup handles closing applications that use files being replaced, preserves installer-owned files such as the uninstaller and shortcuts, and returns its real exit status to the updater. `eDesk-Setup.exe` remains the first-install/recovery filename.
+The update payload `edesk-X.Y.Z-install.exe` is a copy of the Inno Setup installer used for first installation. It is launched through the verified elevated handoff with silent-update options and the exact directory of the running eDesk executable. Inno Setup force-closes applications that hold files being replaced, preserves installer-owned files such as the uninstaller and shortcuts, and returns its real exit status to the updater. The installer itself launches eDesk after installation; the update handoff does not ask Restart Manager to relaunch the old process. `eDesk-Setup.exe` remains the first-install/recovery filename.
 
 ## Signed metadata
 
