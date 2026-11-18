@@ -25,7 +25,8 @@ UninstallDisplayIcon={app}\edesk.exe
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-CloseApplications=yes
+; Force-close eDesk processes holding files that must be replaced during an in-app update.
+CloseApplications=force
 RestartApplications=no
 Uninstallable=yes
 VersionInfoVersion={#MyAppVersion}.0
