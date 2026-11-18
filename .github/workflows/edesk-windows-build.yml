@@ -40,6 +40,9 @@ jobs:
 
   build-windows-x64:
     name: Build Windows x64 baseline
+    permissions:
+      contents: write
+      actions: read
     runs-on: windows-2022
     needs: [generate-bridge, build-topmost-window]
     steps:
