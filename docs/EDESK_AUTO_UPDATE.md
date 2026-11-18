@@ -20,7 +20,7 @@ The only update source is:
 
 Stable release tags use `edesk-vX.Y.Z`. Drafts and prereleases are excluded. The client constructs and validates the release URL itself rather than trusting a URL from the API response.
 
-The update payload is the self-contained Windows portable package produced by `libs/portable`, named `edesk-X.Y.Z-install.exe`. This package contains the full application runtime and is launched through the existing verified Windows update handoff. The separate `eDesk-Setup.exe` remains the first-install/recovery installer.
+The update payload `edesk-X.Y.Z-install.exe` is a copy of the Inno Setup installer used for first installation. It is launched through the verified elevated handoff with silent-update options and the exact directory of the running eDesk executable. Inno Setup handles closing applications that use files being replaced, preserves installer-owned files such as the uninstaller and shortcuts, and returns its real exit status to the updater. `eDesk-Setup.exe` remains the first-install/recovery filename.
 
 ## Signed metadata
 
@@ -43,7 +43,7 @@ Its value must be the single base64 line in `EDESK_UPDATE_SIGNING_KEY.txt` suppl
 
 1. Every push to the `edesk-work` branch starts the Windows build automatically. A manual workflow dispatch is also available.
 2. The workflow reads the latest stable eDesk release, increments the patch version, and embeds that unique version into the build without requiring a source edit.
-3. GitHub Actions builds the Windows app, portable update package, and Inno Setup installer.
+3. GitHub Actions builds the Windows app and Inno Setup installer, then publishes that installer under the signed update asset filename.
 4. The workflow signs the metadata using `EDESK_UPDATE_SIGNING_KEY` and publishes a stable `edesk-vX.Y.Z` GitHub Release automatically.
 5. Installed eDesk clients discover the new release at startup or during their periodic check and show the in-app update notice. The user chooses when to install.
 
@@ -72,4 +72,4 @@ A failed build or signing step does not publish a release. CI artifacts remain a
 9. Updates are not started during active remote sessions.
 10. A failed check or download does not damage the installed application.
 
-**Not yet production-verified:** CI build of the portable update package, GitHub release publication using the configured secret, and end-to-end update from an already installed eDesk version on Windows.
+**Not yet production-verified:** CI build, GitHub release publication using the configured secret, and end-to-end update from an already installed eDesk version on Windows.
