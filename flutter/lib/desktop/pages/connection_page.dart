@@ -299,7 +299,11 @@ class _ConnectionPageState extends State<ConnectionPage>
       bool isTerminal = false,
       bool isTcpTunneling = false}) {
     var id = _idController.id;
+    // Use attended access by default: the remote computer will show
+    // Accept/Decline, so the connecting user is not prompted for a password.
+    // Password authentication remains available for explicit/unattended flows.
     connect(context, id,
+        loginMethod: 'request-approval',
         isFileTransfer: isFileTransfer,
         isViewCamera: isViewCamera,
         isTerminal: isTerminal,
