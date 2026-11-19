@@ -261,8 +261,8 @@ class UpdateProgressState extends State<UpdateProgress> {
     msgBox(
       gFFI.sessionId,
       'custom-nocancel',
-      '{$appName} Update',
-      '{$appName}-to-update-tip',
+      'eDesk Update',
+      'eDesk will close now and install the new version.',
       '',
       gFFI.dialogManager,
       onSubmit: () async {
