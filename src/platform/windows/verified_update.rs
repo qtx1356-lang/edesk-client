@@ -116,21 +116,20 @@ fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
         staged_metadata.len()
     );
 
-    // The background eDesk service runs from the same installed executable and
-    // can keep Flutter/plugin DLLs loaded even after the GUI is closed. Ask the
-    // Service Control Manager to stop it first, then terminate any remaining
-    // per-user eDesk processes before replacing installed files.
-    let sc = get_system_executable("sc.exe")?;
-    let sc = path_for_cmd_environment(&sc)?;
+    // Close every eDesk instance before setup replaces Flutter/plugin DLLs.
+    // First request a normal Windows close so the notification-area icon is
+    // removed cleanly. If the hidden tray process does not exit, force-close it,
+    // then verify that no edesk.exe process remains before starting setup.
     let taskkill = get_system_executable("taskkill.exe")?;
     let taskkill = path_for_cmd_environment(&taskkill)?;
+    let tasklist = get_system_executable("tasklist.exe")?;
+    let tasklist = path_for_cmd_environment(&tasklist)?;
     let timeout = get_system_executable("timeout.exe")?;
     let timeout = path_for_cmd_environment(&timeout)?;
-    let current_pid = std::process::id();
     let setup_log = Path::new(install_dir).join("eDesk-update-setup.log");
     let setup_log = path_for_cmd_environment(&setup_log)?;
     let script = format!(
-        "\"{sc}\" stop eDesk > nul 2>&1\r\n\"{timeout}\" /T 8 /NOBREAK > nul\r\n\"{taskkill}\" /F /PID {current_pid} > nul 2>&1\r\n\"{taskkill}\" /F /IM edesk.exe > nul 2>&1\r\n\"{timeout}\" /T 3 /NOBREAK > nul\r\n\"{staged_path}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /LOG=\"{setup_log}\" /LOGCLOSEAPPLICATIONS /EDESKUPDATE=1 /DIR=\"{install_dir}\"\r\nset \"RUSTDESK_SETUP_EXIT_CODE=%ERRORLEVEL%\"\r\nif not \"%RUSTDESK_SETUP_EXIT_CODE%\"==\"0\" exit /b %RUSTDESK_SETUP_EXIT_CODE%"
+        "\"{taskkill}\" /IM edesk.exe > nul 2>&1\r\nfor /L %%I in (1,1,10) do (\r\n  \"{tasklist}\" /FI \"IMAGENAME eq edesk.exe\" /NH | findstr /I /C:\"edesk.exe\" > nul\r\n  if errorlevel 1 goto edesk_process_closed\r\n  \"{timeout}\" /T 1 /NOBREAK > nul\r\n)\r\n\"{taskkill}\" /F /IM edesk.exe > nul 2>&1\r\nfor /L %%I in (1,1,30) do (\r\n  \"{tasklist}\" /FI \"IMAGENAME eq edesk.exe\" /NH | findstr /I /C:\"edesk.exe\" > nul\r\n  if errorlevel 1 goto edesk_process_closed\r\n  \"{timeout}\" /T 1 /NOBREAK > nul\r\n)\r\n\"{tasklist}\" /FI \"IMAGENAME eq edesk.exe\" /NH | findstr /I /C:\"edesk.exe\" > nul\r\nif not errorlevel 1 exit /b 0x5253000D\r\n:edesk_process_closed\r\n\"{staged_path}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /LOG=\"{setup_log}\" /LOGCLOSEAPPLICATIONS /EDESKUPDATE=1 /DIR=\"{install_dir}\"\r\nset \"RUSTDESK_SETUP_EXIT_CODE=%ERRORLEVEL%\"\r\nif not \"%RUSTDESK_SETUP_EXIT_CODE%\"==\"0\" exit /b %RUSTDESK_SETUP_EXIT_CODE%"
     );
     run_cmds(
         InstallCommands {
