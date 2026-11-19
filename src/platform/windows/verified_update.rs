@@ -116,10 +116,11 @@ fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
         staged_metadata.len()
     );
 
-    // The update handler runs inside the GUI process. Do not wait for Inno Setup
-    // while that process still owns the DLLs being replaced: terminate this exact
-    // GUI PID from the elevated handoff, then let the installer replace the files.
-    // The installer is explicitly told to relaunch eDesk after a silent update.
+    // The update handler runs inside the GUI process. Other eDesk processes
+    // (tray instances and the background service) can still hold installed DLLs,
+    // so close the complete eDesk process tree before running the installer.
+    // The taskkill commands are best-effort: the installer remains responsible
+    // for reporting a real installation failure.
     let taskkill = get_system_executable("taskkill.exe")?;
     let taskkill = path_for_cmd_environment(&taskkill)?;
     let timeout = get_system_executable("timeout.exe")?;
@@ -128,7 +129,7 @@ fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
     let setup_log = Path::new(install_dir).join("eDesk-update-setup.log");
     let setup_log = path_for_cmd_environment(&setup_log)?;
     let script = format!(
-        "\"{taskkill}\" /F /PID {current_pid} > nul 2>&1\r\n\"{timeout}\" /T 2 /NOBREAK > nul\r\n\"{staged_path}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /LOG=\"{setup_log}\" /LOGCLOSEAPPLICATIONS /EDESKUPDATE=1 /DIR=\"{install_dir}\"\r\nset \"RUSTDESK_SETUP_EXIT_CODE=%ERRORLEVEL%\"\r\nif not \"%RUSTDESK_SETUP_EXIT_CODE%\"==\"0\" exit /b %RUSTDESK_SETUP_EXIT_CODE%"
+        "\"{taskkill}\" /F /PID {current_pid} /T > nul 2>&1\r\n\"{taskkill}\" /F /IM edesk.exe /T > nul 2>&1\r\n\"{timeout}\" /T 4 /NOBREAK > nul\r\n\"{staged_path}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /LOG=\"{setup_log}\" /LOGCLOSEAPPLICATIONS /EDESKUPDATE=1 /DIR=\"{install_dir}\"\r\nset \"RUSTDESK_SETUP_EXIT_CODE=%ERRORLEVEL%\"\r\nif not \"%RUSTDESK_SETUP_EXIT_CODE%\"==\"0\" exit /b %RUSTDESK_SETUP_EXIT_CODE%"
     );
     run_cmds(
         InstallCommands {
