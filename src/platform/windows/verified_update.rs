@@ -4,7 +4,7 @@ use super::{
     get_custom_client_staging_dir, get_reg_of_hkcr, handle_custom_client_staging_dir_before_update,
     installer_files::ProtectedInstallFile,
     installer_handoff::{run_cmds, InstallCommands},
-    installer_shell::path_for_cmd_environment,
+    installer_shell::{get_system_executable, path_for_cmd_environment},
     remove_custom_client_staging_dir, ResultType, REG_NAME_INSTALL_PRINTER,
 };
 use hbb_common::{allow_err, anyhow::anyhow, bail, log};
@@ -116,12 +116,19 @@ fn launch_verified_exe(exe: &str, expected_sha256: &str) -> ResultType<()> {
         staged_metadata.len()
     );
 
-    // The release EXE is the Inno Setup installer, not the portable packer.
-    // Inno Setup's CloseApplications support handles the running eDesk process,
-    // while /DIR preserves custom install locations. Capture its actual exit
-    // status so a failed install cannot be reported as a successful update.
+    // The update handler runs inside the GUI process. Do not wait for Inno Setup
+    // while that process still owns the DLLs being replaced: terminate this exact
+    // GUI PID from the elevated handoff, then let the installer replace the files.
+    // The installer is explicitly told to relaunch eDesk after a silent update.
+    let taskkill = get_system_executable("taskkill.exe")?;
+    let taskkill = path_for_cmd_environment(&taskkill)?;
+    let timeout = get_system_executable("timeout.exe")?;
+    let timeout = path_for_cmd_environment(&timeout)?;
+    let current_pid = std::process::id();
+    let setup_log = Path::new(install_dir).join("eDesk-update-setup.log");
+    let setup_log = path_for_cmd_environment(&setup_log)?;
     let script = format!(
-        "\"{staged_path}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /DIR=\"{install_dir}\"\r\nset \"RUSTDESK_SETUP_EXIT_CODE=%ERRORLEVEL%\"\r\nif not \"%RUSTDESK_SETUP_EXIT_CODE%\"==\"0\" exit /b %RUSTDESK_SETUP_EXIT_CODE%"
+        "\"{taskkill}\" /F /PID {current_pid} > nul 2>&1\r\n\"{timeout}\" /T 2 /NOBREAK > nul\r\n\"{staged_path}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /LOG=\"{setup_log}\" /LOGCLOSEAPPLICATIONS /EDESKUPDATE=1 /DIR=\"{install_dir}\"\r\nset \"RUSTDESK_SETUP_EXIT_CODE=%ERRORLEVEL%\"\r\nif not \"%RUSTDESK_SETUP_EXIT_CODE%\"==\"0\" exit /b %RUSTDESK_SETUP_EXIT_CODE%"
     );
     run_cmds(
         InstallCommands {
