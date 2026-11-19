@@ -1,5 +1,5 @@
 name: eDesk Windows x64 build and release
-run-name: eDesk Windows build
+run-name: eDesk Windows build — 1.5.36 in-app updater validation
 
 on:
   # Automatically build and publish a signed update after changes to the app.
