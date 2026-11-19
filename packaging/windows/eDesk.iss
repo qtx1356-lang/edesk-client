@@ -55,10 +55,18 @@ Name: "{autodesktop}\\eDesk"; Filename: "{app}\\{#MyAppExeName}"; IconFilename: 
 [Run]
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""eDesk LAN Discovery"" dir=in action=allow protocol=UDP localport=21119 remoteip=LocalSubnet profile=any enable=yes"; StatusMsg: "Configuring eDesk local network discovery..."; Flags: runhidden waituntilterminated
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-service"; StatusMsg: "Installing eDesk background service..."; Flags: runhidden waituntilterminated
+; Silent in-app updates must launch eDesk independently of the postinstall checkbox.
+; The postinstall entry below is retained only for normal interactive installs.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait runasoriginaluser; Check: IsEdeskUpdate
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch eDesk"; Flags: postinstall nowait runasoriginaluser; Check: ShouldLaunchEdeskAfterInstall
 
 [Code]
+function IsEdeskUpdate: Boolean;
+begin
+  Result := (ExpandConstant('{param:EDESKUPDATE|0}') = '1');
+end;
+
 function ShouldLaunchEdeskAfterInstall: Boolean;
 begin
-  Result := (not WizardSilent) or (ExpandConstant('{param:EDESKUPDATE|0}') = '1');
+  Result := (not WizardSilent) and (not IsEdeskUpdate);
 end;
